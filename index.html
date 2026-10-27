@@ -87,13 +87,16 @@
 <body class="min-h-screen bg-canvas font-sans text-slate-800 antialiased">
   <!-- САЙДБАР -->
   <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200/80 bg-white transition-transform duration-200 lg:translate-x-0" aria-label="Главное меню">
-    <a href="#/knowledge" class="flex items-center gap-3 px-6 pb-4 pt-6">
-      <span class="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-fuchsia-500 shadow-lg shadow-brand-500/30" data-emoji="cap" data-size="28"></span>
-      <span>
-        <span class="block font-display text-lg font-semibold leading-none text-slate-900">UIB Hub</span>
-        <span class="text-xs font-medium text-slate-400">студенческий хаб</span>
-      </span>
-    </a>
+    <div class="flex items-center gap-2 pb-4 pl-6 pr-4 pt-6">
+      <a href="#/knowledge" class="flex min-w-0 flex-1 items-center gap-3">
+        <span class="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-fuchsia-500 shadow-lg shadow-brand-500/30" data-emoji="cap" data-size="28"></span>
+        <span>
+          <span class="block font-display text-lg font-semibold leading-none text-slate-900">UIB Hub</span>
+          <span class="text-xs font-medium text-slate-400">студенческий хаб</span>
+        </span>
+      </a>
+      <button type="button" data-reload class="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Обновить сайт" title="Обновить сайт"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+    </div>
 
     <nav class="flex-1 overflow-y-auto px-3">
       <div class="nav-label">Учёба</div>
@@ -125,7 +128,8 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
       <span class="font-display font-semibold text-slate-900">UIB Hub</span>
-      <div class="ml-auto" data-account="compact"></div>
+      <button type="button" data-reload class="ml-auto grid h-10 w-10 place-items-center rounded-xl text-slate-500 ring-1 ring-slate-200 active:bg-slate-100" aria-label="Обновить сайт"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+      <div data-account="compact"></div>
     </header>
 
     <main class="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-10">
@@ -511,6 +515,29 @@
       </form>
     </div>
   </dialog>
+
+  <!-- Просмотр файла работы -->
+  <dialog id="viewer-dialog" class="sheet w-[min(860px,calc(100vw-32px))]">
+    <div class="p-4 sm:p-6">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h2 id="viewer-title" class="truncate font-display text-base font-semibold text-slate-900 sm:text-lg"></h2>
+          <p id="viewer-meta" class="text-sm text-slate-400"></p>
+        </div>
+        <button type="button" data-close class="btn-ghost -mr-2 -mt-1 shrink-0" aria-label="Закрыть">✕</button>
+      </div>
+      <div id="viewer-body" class="mt-4"></div>
+      <div id="viewer-actions" class="mt-4 flex flex-wrap gap-2 sm:justify-end"></div>
+    </div>
+  </dialog>
+
+  <!-- Плашка «Сайт обновился» -->
+  <div id="update-banner" role="status" class="fixed inset-x-3 bottom-3 z-50 mx-auto flex hidden max-w-md items-center gap-3 rounded-2xl bg-slate-900 py-2.5 pl-4 pr-2.5 text-sm text-white shadow-2xl shadow-slate-900/30 sm:inset-x-auto sm:bottom-6 sm:right-6" style="margin-bottom: env(safe-area-inset-bottom)">
+    <span data-emoji="sparkles" data-size="22"></span>
+    <span class="min-w-0 flex-1"><b class="block">Сайт обновился</b><span class="text-xs text-white/60">Новые работы или исправления уже готовы</span></span>
+    <button type="button" data-reload class="shrink-0 rounded-xl bg-white px-3.5 py-2 font-bold text-slate-900 transition hover:bg-slate-100">Обновить</button>
+    <button id="update-dismiss" type="button" class="shrink-0 px-1.5 text-white/50 hover:text-white" aria-label="Скрыть">✕</button>
+  </div>
 
   <!-- Профиль: аватарка и выход -->
   <dialog id="profile-dialog" class="sheet w-[min(480px,calc(100vw-32px))]">

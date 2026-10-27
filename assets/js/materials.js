@@ -2,6 +2,7 @@ import { api, AVATARS, avatarImage, requireLogin } from './auth.js';
 import { CONFIG } from './config.js';
 import { emoji, subjectEmoji } from './emoji.js';
 import { escapeHtml, fetchJson, formatRelative, safeUrl } from './utils.js';
+import { openFile } from './viewer.js';
 
 const state = {
   items: [],
@@ -66,27 +67,22 @@ export async function initMaterials() {
   render();
 }
 
-async function downloadFile(button) {
+async function openAttachment(button) {
   if (!(await requireLogin('Чтобы скачать файл, войди в аккаунт.'))) return;
   const label = button.querySelector('span');
   const text = label.textContent;
   button.disabled = true;
-  label.textContent = 'Скачиваю…';
+  label.textContent = 'Открываю…';
   try {
     const res = await api(`/files/${encodeURIComponent(button.dataset.download)}`);
     if (res.status === 401) {
       label.textContent = text;
       button.disabled = false;
-      return downloadFile(button); // сессия истекла — войти и повторить
+      return openAttachment(button); // сессия истекла — войти и повторить
     }
     if (!res.ok) throw new Error(res.status === 404 ? 'Файл не найден' : `HTTP ${res.status}`);
-    const url = URL.createObjectURL(await res.blob());
-    const a = Object.assign(document.createElement('a'), { href: url, download: button.dataset.name });
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
     label.textContent = text;
+    await openFile(await res.blob(), button.dataset.name);
   } catch (err) {
     console.error(err);
     label.textContent = err.message === 'Файл не найден' ? err.message : 'Не получилось, ещё раз';
@@ -98,7 +94,7 @@ async function downloadFile(button) {
 function bindEvents() {
   el.grid.addEventListener('click', (event) => {
     const button = event.target.closest('[data-download]');
-    if (button) downloadFile(button);
+    if (button) openAttachment(button);
   });
   el.search.addEventListener('input', () => { state.query = el.search.value.trim().toLowerCase(); render(); });
   el.subject.addEventListener('change', () => { state.subject = el.subject.value; render(); });

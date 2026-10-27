@@ -5,6 +5,8 @@ import { initGuide } from './guide.js';
 import { initMaterials } from './materials.js';
 import { initMarketplace, prefillOrder } from './marketplace.js';
 import { initSubmit } from './submit.js';
+import { initUpdates } from './update.js';
+import { initViewer } from './viewer.js';
 
 const ROUTES = ['knowledge', 'guide', 'deadlines', 'teachers', 'marketplace', 'utils', 'memes'];
 const DEFAULT_ROUTE = 'knowledge';
@@ -57,6 +59,8 @@ document.addEventListener('click', (event) => {
 
 hydrateEmoji();
 initAuth();
+initViewer();
+initUpdates();
 initMarketplace();
 initSubmit();
 window.addEventListener('hashchange', navigate);

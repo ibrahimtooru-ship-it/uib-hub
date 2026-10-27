@@ -12,7 +12,7 @@ const TELEGRAM_RE = /^@?[A-Za-z0-9_]{5,32}$/;
 // Те же id проверяет Worker; картинки лежат в assets/avatars/
 export const AVATARS = [
   { id: 'it', label: 'IT' },
-  { id: 'marketing', label: 'Креатив и PR' },
+  { id: 'marketing', label: 'Маркетинг' },
   { id: 'finance', label: 'Финансы' },
   { id: 'accounting', label: 'Учёт' },
   { id: 'logistics', label: 'Логистика' },
