@@ -119,6 +119,16 @@ check('guide.json: разделы, эмодзи, таблицы', () => {
   ];
 });
 
+check('Аватарки: списки на сайте и в Worker совпадают, картинки на месте', () => {
+  const site = [...read('assets/js/auth.js').matchAll(/\{ id: '([a-z]+)', label:/g)].map((m) => m[1]);
+  const worker = read('worker/src/index.js').match(/const AVATARS = \[([^\]]+)\]/)?.[1].match(/'([a-z]+)'/g)?.map((x) => x.slice(1, -1)) ?? [];
+  const files = readdirSync(join(ROOT, 'assets/avatars')).map((f) => f.replace(/\.jpg$/, ''));
+  return [
+    ...(site.join() === worker.join() ? [] : [`сайт: ${site.join()} ≠ Worker: ${worker.join()}`]),
+    ...site.filter((id) => !files.includes(id)).map((id) => `нет картинки assets/avatars/${id}.jpg`),
+  ];
+});
+
 // --- Разметка ---
 
 check('index.html: все id, которые ищет JS, существуют', () => {
@@ -168,7 +178,7 @@ await checkAsync('Разбор .ics', async () => {
 
 // --- Worker (Telegram, GitHub и KV — заглушки, в сеть ничего не уходит) ---
 
-await checkAsync('Worker: аккаунты, приём, модерация, публикация, файлы', async () => {
+await checkAsync('Worker: аккаунты, сброс пароля, аватарки, работы, заявки, файлы', async () => {
   const worker = (await importLocal('worker/src/index.js')).default;
   // KV в памяти: значение + metadata, как в Cloudflare
   const kv = new Map();
@@ -251,7 +261,7 @@ await checkAsync('Worker: аккаунты, приём, модерация, пу
     res = await call('POST', '/auth/login', { body: { barcode: '1111111', password: 'wrong-pass' } });
     expect(res.status === 401, 'вход с неверным паролем');
     res = await call('POST', '/auth/login', { body: { barcode: '1111111', password: 'secret123' } });
-    const { token } = await res.json();
+    let { token } = await res.json();
     expect(res.status === 200 && token, `вход с верным паролем: ${res.status}`);
     res = await call('GET', '/auth/me', { token });
     expect(res.status === 200 && (await res.json()).user?.nickname === 'Кот Учёный', '/auth/me по токену');
@@ -330,6 +340,71 @@ await checkAsync('Worker: аккаунты, приём, модерация, пу
     const { id: rejectId } = await res.json();
     await press(`r:${rejectId}`);
     expect(!kv.has(`pending:${rejectId}`) && !kv.has(`file:${rejectId}`), 'после отклонения остались заявка или файл');
+
+    // --- Аватарка ---
+    res = await call('POST', '/auth/profile', { body: { avatar: 'it' } });
+    expect(res.status === 401, 'аватарка меняется без входа');
+    res = await call('POST', '/auth/profile', { body: { avatar: '../../etc' }, token });
+    expect(res.status === 400, 'принята аватарка не из списка');
+    res = await call('POST', '/auth/profile', { body: { avatar: 'law' }, token });
+    expect(res.status === 200 && (await res.json()).user?.avatar === 'law', 'аватарка не сохранилась');
+    res = await upload(token, { type: 'material', data: { ...work.data, author: { anonymous: false } } }, null);
+    const { id: avatarWorkId } = await res.json();
+    expect(JSON.parse(kv.get(`pending:${avatarWorkId}`)?.value ?? '{}').material?.author?.avatar === 'law', 'аватарка не попала в подпись работы');
+    await press(`r:${avatarWorkId}`);
+    res = await call('POST', '/auth/profile', { body: { avatar: null }, token });
+    expect(res.status === 200 && (await res.json()).user?.avatar === null, 'нельзя убрать аватарку');
+
+    // --- Заявка маркетплейса: в чат модераторов, а не в чей-то личный Telegram ---
+    const order = { category: 'notes', subject: 'Философия', task: 'Конспект 8 лекций', deadline_at: '2026-10-30T20:39:00.000Z', price: 3000, comment: 'Тетрадь', contact: 'student_tg' };
+    res = await call('POST', '/orders', { body: order });
+    expect(res.status === 401, 'заявка принята без входа');
+    res = await call('POST', '/orders', { body: { ...order, contact: 'кот' }, token });
+    expect(res.status === 400 && (await res.json()).error === 'bad_contact', 'принят кривой Telegram');
+    telegram.length = 0;
+    res = await call('POST', '/orders', { body: order, token });
+    const card = telegram.find((t) => t.method === 'sendMessage')?.body;
+    expect(res.status === 200 && card?.chat_id === env.MODERATOR_CHAT_ID, `заявка не дошла до модераторов: ${res.status}`);
+    expect(card?.text.includes('@student_tg') && card.text.includes('1111111') && card.text.includes('31 октября') && card.text.includes('01:39'), `карточка заявки: ${card?.text}`);
+
+    // --- Восстановление пароля через модераторов ---
+    res = await call('POST', '/auth/reset-request', { body: { barcode: '9999999', contact: '@ghost_user' } });
+    const unknown = res.status;
+    telegram.length = 0;
+    res = await call('POST', '/auth/reset-request', { body: { barcode: '1111111', contact: '@kot_tg' } });
+    expect(res.status === 200 && unknown === 200, 'ответ выдаёт, существует ли баркод');
+    const resetCard = telegram.find((t) => t.method === 'sendMessage')?.body;
+    expect(resetCard?.reply_markup?.inline_keyboard?.[0]?.[0]?.callback_data === 'k:1111111' && resetCard.text.includes('@kot_tg'), 'заявка на сброс не дошла до модераторов');
+
+    telegram.length = 0;
+    await press('k:1111111', 999);
+    expect(!kv.has('reset:1111111'), 'код выдан из чужого чата');
+    await press('k:1111111');
+    const issued = telegram.find((t) => t.method === 'editMessageText')?.body.text ?? '';
+    const code = issued.match(/[A-Z2-9]{4}-[A-Z2-9]{4}/)?.[0];
+    expect(code && issued.includes('@kot_tg'), `код не показан модератору: ${issued}`);
+    telegram.length = 0;
+    await press('k:1111111');
+    expect(telegram.some((t) => t.body.text === 'Заявка устарела или код уже выдан'), 'код выдан второй раз по той же заявке');
+
+    res = await call('POST', '/auth/reset', { body: { barcode: '1111111', code: 'AAAA-AAAA', password: 'new-pass-123' } });
+    expect(res.status === 400 && (await res.json()).error === 'bad_code', 'принят неверный код');
+    res = await call('POST', '/auth/reset', { body: { barcode: '1111111', code: code?.toLowerCase(), password: 'new-pass-123' } });
+    const reset = await res.json();
+    expect(res.status === 200 && reset.token, `сброс по коду: ${res.status}`);
+    res = await call('GET', '/auth/me', { token });
+    expect(res.status === 401, 'старая сессия работает после сброса пароля');
+    res = await call('POST', '/auth/login', { body: { barcode: '1111111', password: 'secret123' } });
+    expect(res.status === 401, 'старый пароль работает после сброса');
+    res = await call('POST', '/auth/reset', { body: { barcode: '1111111', code, password: 'another-pass' } });
+    expect(res.status === 400, 'код сработал второй раз');
+    token = reset.token;
+
+    // Сессии до сброса паролей хранили только баркод — они должны продолжать работать
+    kv.set('session:legacy-token-0123456789abcdef', { value: '2222222', metadata: null });
+    await call('POST', '/auth/register', { body: { barcode: '2222222', password: 'legacy-pass', nickname: 'Старожил' } });
+    res = await call('GET', '/auth/me', { token: 'legacy-token-0123456789abcdef' });
+    expect(res.status === 200, 'сессия старого формата перестала работать');
 
     await call('POST', '/auth/logout', { token });
     res = await call('GET', '/auth/me', { token });

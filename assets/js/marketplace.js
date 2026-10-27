@@ -1,8 +1,19 @@
 // Ядро маркетплейса. Сейчас P2P без комиссии. Escrow включается сменой
 // CONFIG.MARKETPLACE.paymentMode / serviceFeePercent и реализацией PAYMENT_ADAPTERS.escrow,
 // а формы, карточки и расчёты остаются прежними.
+import { api, requireLogin } from './auth.js';
 import { CONFIG } from './config.js';
-import { escapeHtml, formatDate, formatMoney } from './utils.js';
+import { escapeHtml, formatDate, formatMoney, storage } from './utils.js';
+
+const CONTACT_KEY = 'uibhub.telegram';
+const TELEGRAM_RE = /^@?[A-Za-z0-9_]{5,32}$/;
+// Коды ошибок Worker'а
+const ORDER_ERRORS = {
+  subject_and_task_required: 'Укажи предмет и что нужно сделать.',
+  bad_contact: 'Telegram: ник латиницей, 5–32 символа, например @username.',
+  rate_limited: 'Слишком много заявок подряд. Попробуй через час.',
+  auth_required: 'Сессия закончилась. Войди заново и отправь ещё раз.',
+};
 
 const CATEGORY_LABELS = {
   homework: 'Помощь с ДЗ / лабой',
@@ -70,17 +81,63 @@ export function orderContactUrl(order, username = CONFIG.TELEGRAM.ordersUsername
 
 let form;
 let summary;
+let status;
 
 export function initMarketplace() {
   form = document.getElementById('order-form');
   summary = document.getElementById('order-summary');
+  status = document.getElementById('order-status');
+  form.elements.contact.value = storage.get(CONTACT_KEY, '');
   form.addEventListener('input', renderSummary);
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const order = createOrder(readForm());
-    window.open(orderContactUrl(order), '_blank', 'noopener');
-  });
+  form.addEventListener('submit', onSubmit);
   renderSummary();
+}
+
+function setStatus(text, ok = false) {
+  status.textContent = text;
+  status.classList.toggle('text-emerald-700', ok);
+  status.classList.toggle('text-red-600', !ok);
+}
+
+async function onSubmit(event) {
+  event.preventDefault();
+  const fields = readForm();
+  const order = createOrder(fields);
+
+  // Без Worker'а — старый путь: чат с модератором в Telegram
+  if (!CONFIG.API_BASE) {
+    window.open(orderContactUrl(order), '_blank', 'noopener');
+    return;
+  }
+
+  if (!fields.subject || !fields.task) return setStatus(ORDER_ERRORS.subject_and_task_required);
+  if (!TELEGRAM_RE.test(fields.contact)) return setStatus(ORDER_ERRORS.bad_contact);
+  if (!(await requireLogin('Чтобы отправить заявку, войди в аккаунт.'))) return;
+
+  const button = form.querySelector('[type="submit"]');
+  button.disabled = true;
+  setStatus('');
+  try {
+    const res = await api('/orders', {
+      method: 'POST',
+      json: { category: order.category, subject: order.subject, task: order.task, deadline_at: order.deadline_at, price: order.price, comment: order.comment, contact: fields.contact },
+    });
+    if (res.ok) {
+      storage.set(CONTACT_KEY, fields.contact);
+      form.reset();
+      form.elements.contact.value = fields.contact;
+      renderSummary();
+      setStatus('Готово! Заявка у модераторов, они напишут тебе в Telegram.', true);
+    } else {
+      const { error } = await res.json().catch(() => ({}));
+      setStatus(ORDER_ERRORS[error] ?? 'Не получилось отправить. Попробуй ещё раз чуть позже.');
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus('Нет связи с сервером. Проверь интернет и попробуй ещё раз.');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 // Префилл из кнопки «🔥 Не успеваешь?» на дашборде
@@ -103,6 +160,7 @@ function readForm() {
     deadlineAt: deadline && !Number.isNaN(deadline.getTime()) ? deadline.toISOString() : null,
     price: f.price.value,
     comment: f.comment.value.trim(),
+    contact: f.contact.value.trim(),
   };
 }
 

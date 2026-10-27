@@ -4,7 +4,11 @@
 //   POST /auth/login     ← баркод + пароль → токен сессии
 //   GET  /auth/me        ← кто вошёл (по токену)
 //   POST /auth/logout    ← завершить сессию
-//   POST /submit         ← форма «Добавить работу» (только после входа; multipart: payload + необязательный file):
+//   POST /auth/profile   ← выбрать аватарку
+//   POST /auth/reset-request ← «Забыл пароль»: заявка модераторам, они выдают одноразовый код лично
+//   POST /auth/reset     ← баркод + код от модератора + новый пароль
+//   POST /orders         ← заявка маркетплейса «Ищу исполнителя» (после входа) → в чат модераторов
+//   POST /submit        ← форма «Добавить работу» (только после входа; multipart: payload + необязательный file):
 //                          работа и файл уходят в очередь (KV) и модераторам в Telegram с кнопками ✅ / ❌
 //   GET  /files/:id      ← скачать файл работы (только после входа)
 //   POST /telegram       ← webhook бота: ✅ публикует работу в materials.json (файл остаётся закрытым в KV),
@@ -38,6 +42,12 @@ const FILE_TYPES = {
 };
 const BARCODE_RE = /^\d{5,10}$/;
 const NICKNAME_RE = /^[\p{L}\p{N}_. -]{2,24}$/u;
+const TELEGRAM_RE = /^@?[A-Za-z0-9_]{5,32}$/;
+// Те же id и картинки в assets/js/auth.js и assets/avatars/
+const AVATARS = ['it', 'marketing', 'finance', 'accounting', 'logistics', 'intl', 'management', 'law', 'journalism'];
+const RESET_TTL = 60 * 60 * 24;          // код сброса пароля действует сутки
+// Без похожих символов (0/O, 1/I/L), чтобы код легко продиктовать
+const RESET_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 // Workers ограничивают PBKDF2 сотней тысяч итераций
 const PBKDF2_ITERATIONS = 100000;
 
@@ -57,6 +67,10 @@ export default {
       if (route === 'POST /auth/login') return withCors(env, await handleLogin(request, env));
       if (route === 'GET /auth/me') return withCors(env, await handleMe(request, env));
       if (route === 'POST /auth/logout') return withCors(env, await handleLogout(request, env));
+      if (route === 'POST /auth/profile') return withCors(env, await handleProfile(request, env));
+      if (route === 'POST /auth/reset-request') return withCors(env, await handleResetRequest(request, env));
+      if (route === 'POST /auth/reset') return withCors(env, await handleReset(request, env));
+      if (route === 'POST /orders') return withCors(env, await handleOrder(request, env));
       if (route === 'POST /submit') return withCors(env, await handleSubmit(request, env));
       if (request.method === 'GET' && pathname.startsWith('/files/')) return withCors(env, await handleDownload(request, env, pathname.slice(7)));
       return withCors(env, json({ ok: false, error: 'not_found' }, 404));
@@ -98,7 +112,7 @@ async function handleRegister(request, env) {
   };
   await env.SUBMISSIONS.put(`user:${barcode}`, JSON.stringify(user));
   await env.SUBMISSIONS.put(`nick:${nickname.toLowerCase()}`, barcode);
-  return json({ ok: true, token: await createSession(env, barcode), user: publicUser(user) });
+  return json({ ok: true, token: await createSession(env, user), user: publicUser(user) });
 }
 
 async function handleLogin(request, env) {
@@ -120,7 +134,7 @@ async function handleLogin(request, env) {
     return json({ ok: false, error: 'bad_credentials' }, 401);
   }
   await env.SUBMISSIONS.delete(failKey);
-  return json({ ok: true, token: await createSession(env, barcode), user: publicUser(user) });
+  return json({ ok: true, token: await createSession(env, user), user: publicUser(user) });
 }
 
 async function handleMe(request, env) {
@@ -134,9 +148,100 @@ async function handleLogout(request, env) {
   return json({ ok: true });
 }
 
-async function createSession(env, barcode) {
+async function handleProfile(request, env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ ok: false, error: 'auth_required' }, 401);
+  const body = await readJson(request);
+  const avatar = body?.avatar ?? null;
+  if (avatar !== null && !AVATARS.includes(avatar)) return json({ ok: false, error: 'bad_avatar' }, 400);
+  const updated = { ...user, avatar };
+  await env.SUBMISSIONS.put(`user:${user.barcode}`, JSON.stringify(updated));
+  return json({ ok: true, user: publicUser(updated) });
+}
+
+// --- Восстановление пароля через модераторов ---
+// Почты у аккаунтов нет, поэтому личность подтверждает человек: модератор сверяет студенческий
+// и лично передаёт одноразовый код. Существует ли баркод, сайту не сообщаем — ответ всегда одинаковый.
+
+async function handleResetRequest(request, env) {
+  const body = await readJson(request);
+  const barcode = String(body?.barcode ?? '').trim();
+  const contact = String(body?.contact ?? '').trim().replace(/^@?/, '@');
+  if (!BARCODE_RE.test(barcode)) return json({ ok: false, error: 'bad_barcode' }, 400);
+  if (!TELEGRAM_RE.test(contact)) return json({ ok: false, error: 'bad_contact' }, 400);
+
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  if (!(await takeRateLimit(env, `reset:${ip}`))) return json({ ok: false, error: 'rate_limited' }, 429);
+
+  const raw = await env.SUBMISSIONS.get(`user:${barcode}`);
+  if (raw && !(await env.SUBMISSIONS.get(`resetreq:${barcode}`))) {
+    const user = JSON.parse(raw);
+    await env.SUBMISSIONS.put(`resetreq:${barcode}`, contact, { expirationTtl: RESET_TTL });
+    await telegram(env, 'sendMessage', {
+      chat_id: env.MODERATOR_CHAT_ID,
+      text: [
+        '🔑 <b>Сброс пароля</b>',
+        '',
+        `<b>Аккаунт:</b> ${escapeHtml(user.nickname)} · баркод ${barcode}`,
+        `<b>Написать:</b> ${escapeHtml(contact)}`,
+        '',
+        'Попроси фото студенческого с этим баркодом. Если всё сходится — нажми кнопку и передай код лично.',
+      ].join('\n'),
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Выдать код', callback_data: `k:${barcode}` }]] },
+    });
+  }
+  return json({ ok: true });
+}
+
+async function issueResetCode(env, callback, barcode) {
+  const contact = await env.SUBMISSIONS.get(`resetreq:${barcode}`);
+  if (!contact) {
+    await answer(env, callback, 'Заявка устарела или код уже выдан');
+    return;
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const code = [...bytes].map((b) => RESET_ALPHABET[b % RESET_ALPHABET.length]).join('');
+  const pretty = `${code.slice(0, 4)}-${code.slice(4)}`;
+  await env.SUBMISSIONS.put(`reset:${barcode}`, bytesToBase64(await sha256(code)), { expirationTtl: RESET_TTL });
+  await env.SUBMISSIONS.delete(`resetreq:${barcode}`);
+  const who = callback.from?.username ? `@${callback.from.username}` : (callback.from?.first_name ?? 'модератор');
+  await closeCard(env, callback, `✅ Код выдал ${who}: ${pretty}\nПередай его лично ${contact}. Действует 24 часа, одноразовый.`);
+}
+
+async function handleReset(request, env) {
+  const body = await readJson(request);
+  const barcode = String(body?.barcode ?? '').trim();
+  const code = String(body?.code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const password = String(body?.password ?? '');
+  if (!BARCODE_RE.test(barcode) || code.length !== 8) return json({ ok: false, error: 'bad_code' }, 400);
+  if (password.length < 8 || password.length > 128) return json({ ok: false, error: 'bad_password' }, 400);
+
+  // Тот же счётчик, что у входа: перебирать коды так же бесполезно, как пароли
+  const failKey = `fail:${barcode}`;
+  const fails = Number(await env.SUBMISSIONS.get(failKey)) || 0;
+  if (fails >= LOGIN_FAILS_LIMIT) return json({ ok: false, error: 'too_many_attempts' }, 429);
+
+  const stored = await env.SUBMISSIONS.get(`reset:${barcode}`);
+  const raw = await env.SUBMISSIONS.get(`user:${barcode}`);
+  if (!stored || !raw || !timingSafeEqual(await sha256(code), base64ToBytes(stored))) {
+    await env.SUBMISSIONS.put(failKey, String(fails + 1), { expirationTtl: 900 });
+    return json({ ok: false, error: 'bad_code' }, 400);
+  }
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const user = JSON.parse(raw);
+  // Новая версия сессий: все старые входы (вдруг пароль украли) перестают действовать
+  const updated = { ...user, salt: bytesToBase64(salt), hash: bytesToBase64(await hashPassword(password, salt)), session_version: (user.session_version ?? 0) + 1 };
+  await env.SUBMISSIONS.put(`user:${barcode}`, JSON.stringify(updated));
+  await env.SUBMISSIONS.delete(`reset:${barcode}`);
+  await env.SUBMISSIONS.delete(failKey);
+  return json({ ok: true, token: await createSession(env, updated), user: publicUser(updated) });
+}
+
+async function createSession(env, user) {
   const token = bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replace(/[+/=]/g, (ch) => ({ '+': '-', '/': '_', '=': '' }[ch]));
-  await env.SUBMISSIONS.put(`session:${token}`, barcode, { expirationTtl: SESSION_TTL });
+  await env.SUBMISSIONS.put(`session:${token}`, `${user.barcode}:${user.session_version ?? 0}`, { expirationTtl: SESSION_TTL });
   return token;
 }
 
@@ -148,14 +253,22 @@ function bearerToken(request) {
 async function currentUser(request, env) {
   const token = bearerToken(request);
   if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return null;
-  const barcode = await env.SUBMISSIONS.get(`session:${token}`);
-  const raw = barcode && await env.SUBMISSIONS.get(`user:${barcode}`);
-  return raw ? JSON.parse(raw) : null;
+  const session = await env.SUBMISSIONS.get(`session:${token}`);
+  if (!session) return null;
+  // Сессии до появления сброса пароля хранили только баркод, без версии
+  const [barcode, version = '0'] = session.split(':');
+  const raw = await env.SUBMISSIONS.get(`user:${barcode}`);
+  const user = raw && JSON.parse(raw);
+  return user && String(user.session_version ?? 0) === version ? user : null;
 }
 
 // Баркод на сайт целиком не отдаём: он виден только модераторам
 function publicUser(user) {
-  return { nickname: user.nickname, barcode_hint: `•••${user.barcode.slice(-3)}` };
+  return { nickname: user.nickname, barcode_hint: `•••${user.barcode.slice(-3)}`, avatar: user.avatar ?? null };
+}
+
+async function sha256(text) {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
 }
 
 async function hashPassword(password, salt) {
@@ -238,6 +351,48 @@ async function handleSubmit(request, env) {
   return json({ ok: true, id: material.id });
 }
 
+// --- Заявка маркетплейса ---
+// Раньше сайт открывал чат с модератором в Telegram; из своего же аккаунта это «Избранное».
+// Теперь заявка, как и работа, приходит карточкой в чат модераторов.
+
+const ORDER_CATEGORIES = { homework: 'Помощь с ДЗ / лабой', notes: 'Конспект', presentation: 'Презентация', tutoring: 'Репетиторство', other: 'Другое' };
+
+async function handleOrder(request, env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ ok: false, error: 'auth_required' }, 401);
+  const body = await readJson(request);
+  const str = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+
+  const subject = str(body?.subject, LIMITS.subject);
+  const task = str(body?.task, LIMITS.tip);
+  const contact = str(body?.contact, 33).replace(/^@?/, '@');
+  if (!subject || !task) return json({ ok: false, error: 'subject_and_task_required' }, 400);
+  if (!TELEGRAM_RE.test(contact)) return json({ ok: false, error: 'bad_contact' }, 400);
+  if (!(await takeRateLimit(env, `order:${user.barcode}`))) return json({ ok: false, error: 'rate_limited' }, 429);
+
+  const price = Math.max(0, Math.min(10_000_000, Math.round(Number(body?.price) || 0)));
+  const deadline = new Date(body?.deadline_at);
+  const line = (label, value) => (value ? `<b>${label}:</b> ${escapeHtml(value)}` : null);
+  await telegram(env, 'sendMessage', {
+    chat_id: env.MODERATOR_CHAT_ID,
+    text: [
+      '🛒 <b>Заявка маркетплейса</b>',
+      '',
+      line('Категория', ORDER_CATEGORIES[body?.category] ?? 'Другое'),
+      line('Предмет', subject),
+      line('Задача', task),
+      // Время UIB (UTC+5) сдвигом вручную: в старых базах часовых поясов Asia/Almaty ещё UTC+6
+      line('Дедлайн', Number.isNaN(deadline.getTime()) ? null : new Date(deadline.getTime() + 5 * 3600e3).toLocaleString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })),
+      line('Бюджет', price ? `${price.toLocaleString('ru-RU')} ₸` : 'не указан'),
+      line('Комментарий', str(body?.comment, 500)),
+      line('Написать', contact),
+      line('Аккаунт', `${user.nickname} · баркод ${user.barcode}`),
+    ].filter(Boolean).join('\n'),
+    parse_mode: 'HTML',
+  });
+  return json({ ok: true });
+}
+
 function describeFile(file) {
   const name = String(file.name || 'file').slice(-120);
   const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
@@ -296,7 +451,7 @@ function cleanMaterial(data, user) {
         .slice(0, LIMITS.stackItems),
       tip: str(data.tip, LIMITS.tip),
       links,
-      author: anonymous ? { display: 'Аноним', anonymous: true } : { display: user.nickname, anonymous: false },
+      author: anonymous ? { display: 'Аноним', anonymous: true } : { display: user.nickname, anonymous: false, avatar: user.avatar ?? null },
       created_at: new Date().toISOString(),
     },
   };
@@ -359,6 +514,10 @@ async function handleTelegram(request, env) {
   }
 
   const [action, id] = callback.data.split(':');
+  if (action === 'k') {
+    await issueResetCode(env, callback, id);
+    return new Response('ok');
+  }
   const key = `pending:${id}`;
   const raw = await env.SUBMISSIONS.get(key);
   if (!raw) {

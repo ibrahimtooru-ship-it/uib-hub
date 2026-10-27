@@ -1,4 +1,4 @@
-import { api, requireLogin } from './auth.js';
+import { api, AVATARS, avatarImage, requireLogin } from './auth.js';
 import { CONFIG } from './config.js';
 import { emoji, subjectEmoji } from './emoji.js';
 import { escapeHtml, fetchJson, formatRelative, safeUrl } from './utils.js';
@@ -325,7 +325,8 @@ export function materialCard(m) {
 
   const author = m.author?.anonymous
     ? `${emoji('disguise', 18)}<span>Аноним</span>`
-    : `${emoji('bust', 18)}<span>${escapeHtml(m.author?.display ?? 'Аноним')}</span>`;
+    // Аватарку из аккаунта показываем, только если такая картинка у нас есть
+    : `${AVATARS.some((a) => a.id === m.author?.avatar) ? avatarImage(m.author.avatar, 20) : emoji('bust', 18)}<span>${escapeHtml(m.author?.display ?? 'Аноним')}</span>`;
   const created = new Date(m.created_at);
 
   return `

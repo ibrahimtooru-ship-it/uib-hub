@@ -264,7 +264,7 @@
         <h1 class="page-title">Маркетплейс</h1>
         <p class="mt-1 text-sm text-slate-500">Лента «Ищу исполнителя / Предлагаю услуги» появится на этапе 3. Пока можно оставить заявку.</p>
 
-        <form id="order-form" class="card mt-6 grid max-w-2xl gap-4 p-6">
+        <form id="order-form" class="card mt-6 grid max-w-2xl gap-4 p-4 sm:p-6 [&_.input]:w-full [&_label]:min-w-0" novalidate>
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Категория
               <select name="category" class="input font-normal">
@@ -290,11 +290,17 @@
               <input name="price" type="number" min="0" step="500" value="3000" class="input font-normal">
             </label>
           </div>
-          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Комментарий
-            <input name="comment" class="input font-normal" placeholder="Формат сдачи, требования препода…">
-          </label>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Комментарий
+              <input name="comment" class="input font-normal" placeholder="Формат сдачи, требования препода…">
+            </label>
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Твой Telegram для связи
+              <input name="contact" autocomplete="off" autocapitalize="off" spellcheck="false" class="input font-normal" placeholder="@username">
+            </label>
+          </div>
           <div id="order-summary" class="rounded-xl bg-slate-50 p-4 text-sm ring-1 ring-slate-100"></div>
-          <button type="submit" class="btn-primary"><span data-emoji="plane" data-size="18"></span>Отправить заявку в Telegram</button>
+          <p id="order-status" class="text-sm font-semibold empty:hidden" aria-live="polite"></p>
+          <button type="submit" class="btn-primary disabled:opacity-60"><span data-emoji="plane" data-size="18"></span>Отправить модераторам</button>
         </form>
       </section>
 
@@ -471,22 +477,54 @@
         <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Баркод
           <input name="barcode" inputmode="numeric" autocomplete="username" maxlength="10" class="input font-normal" placeholder="Цифры со студенческого, как в Academo">
         </label>
-        <label data-register class="grid gap-1.5 text-sm font-semibold text-slate-700">Никнейм
+        <label data-modes="register" class="grid gap-1.5 text-sm font-semibold text-slate-700">Никнейм
           <input name="nickname" autocomplete="nickname" maxlength="24" class="input font-normal" placeholder="Так будут подписаны твои работы">
         </label>
-        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Пароль
+        <label data-modes="forgot" class="grid gap-1.5 text-sm font-semibold text-slate-700">Твой Telegram
+          <input name="contact" autocomplete="off" autocapitalize="off" spellcheck="false" class="input font-normal" placeholder="@username — сюда напишет модератор">
+        </label>
+        <label data-modes="reset" class="grid gap-1.5 text-sm font-semibold text-slate-700">Код от модератора
+          <input name="code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="9" class="input font-mono font-normal uppercase tracking-widest" placeholder="ABCD-2345">
+        </label>
+        <label data-modes="login register reset" class="grid gap-1.5 text-sm font-semibold text-slate-700"><span><span data-modes="login register">Пароль</span><span data-modes="reset">Новый пароль</span></span>
           <input name="password" type="password" autocomplete="current-password" class="input font-normal">
         </label>
-        <label data-register class="grid gap-1.5 text-sm font-semibold text-slate-700">Повтори пароль
+        <label data-modes="register reset" class="grid gap-1.5 text-sm font-semibold text-slate-700">Повтори пароль
           <input name="password2" type="password" autocomplete="new-password" class="input font-normal">
         </label>
-        <div data-register class="flex gap-2.5 rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-100">
+        <div data-modes="register reset" class="flex gap-2.5 rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-100">
           <span data-emoji="locked" data-size="18"></span>
           <p>Придумай <b>новый пароль</b> для UIB Hub, не тот, что от Academo. Баркод видят только модераторы, на сайте показывается только ник.</p>
         </div>
+        <div data-modes="forgot" class="flex gap-2.5 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600 ring-1 ring-slate-100">
+          <span data-emoji="shush" data-size="18"></span>
+          <p>Почты у аккаунтов нет, поэтому пароль восстанавливают модераторы: они напишут тебе, попросят фото студенческого и лично передадут одноразовый код.</p>
+        </div>
         <p id="auth-error" class="text-sm font-semibold text-red-600 empty:hidden" aria-live="polite"></p>
+        <p id="auth-notice" class="rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100 empty:hidden" aria-live="polite"></p>
         <button id="auth-submit" type="submit" class="btn-primary disabled:opacity-60">Войти</button>
+        <div class="flex flex-wrap justify-between gap-2 text-sm font-semibold">
+          <button type="button" data-modes="login" data-auth-mode="forgot" class="text-brand-700 hover:underline">Забыл пароль?</button>
+          <button type="button" data-modes="forgot" data-auth-mode="reset" class="text-brand-700 hover:underline">У меня есть код</button>
+          <button type="button" data-modes="forgot reset" data-auth-mode="login" class="text-slate-500 hover:text-slate-800">← Назад ко входу</button>
+        </div>
       </form>
+    </div>
+  </dialog>
+
+  <!-- Профиль: аватарка и выход -->
+  <dialog id="profile-dialog" class="sheet w-[min(480px,calc(100vw-32px))]">
+    <div class="p-4 sm:p-6">
+      <div class="flex items-start justify-between gap-3">
+        <div id="profile-header" class="flex min-w-0 items-center gap-3"></div>
+        <button type="button" data-close class="btn-ghost -mr-2 -mt-1 shrink-0" aria-label="Закрыть">✕</button>
+      </div>
+      <h3 class="mt-6 text-sm font-bold text-slate-700">Аватарка</h3>
+      <p class="text-xs text-slate-400">Видна рядом с ником и на работах, которые ты подписал своим именем.</p>
+      <div id="profile-avatars" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5"></div>
+      <div class="mt-6 flex justify-end border-t border-slate-100 pt-4">
+        <button type="button" data-logout class="btn-secondary text-red-600">Выйти из аккаунта</button>
+      </div>
     </div>
   </dialog>
 
