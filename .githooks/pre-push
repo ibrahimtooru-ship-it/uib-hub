@@ -1,0 +1,9 @@
+#!/bin/sh
+# Проверки перед push вместо CI на GitHub. Подключается один раз:
+#   git config core.hooksPath .githooks
+# Пропустить в крайнем случае: git push --no-verify
+node scripts/check.mjs || {
+  echo ""
+  echo "Push отменён: исправь ошибки выше и попробуй снова."
+  exit 1
+}
