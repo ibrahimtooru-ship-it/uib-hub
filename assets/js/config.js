@@ -10,10 +10,9 @@ export const CONFIG = {
     moderatorUsername: 'kuruta06',    // кому уходят работы, пока SUBMIT_ENDPOINT не задан
   },
 
-  // Адрес Worker из папки worker/ (см. worker/README.md), например
-  // 'https://uib-hub-submit.<аккаунт>.workers.dev/submit'.
-  // Пока null — форма собирает готовое сообщение и открывает Telegram модератора.
-  SUBMIT_ENDPOINT: null,
+  // Worker из папки worker/ (см. worker/README.md): очередь модерации и публикация в materials.json.
+  // null — форма вместо этого собирает готовое сообщение и открывает Telegram модератора.
+  SUBMIT_ENDPOINT: 'https://uib-hub-submit.uibhub.workers.dev/submit',
 
   MARKETPLACE: {
     currency: 'KZT',

@@ -14,5 +14,5 @@ MATERIALS_PATH = "data/materials.json"
 
 [[kv_namespaces]]
 binding = "SUBMISSIONS"
-# Вставь id из вывода команды: npx wrangler kv namespace create SUBMISSIONS
-id = "PASTE_KV_NAMESPACE_ID"
+# Создано командой: npx wrangler kv namespace create SUBMISSIONS
+id = "6aff2b309b95448098eff2b7d844f6df"
