@@ -348,6 +348,32 @@
         "anonymous": true
       },
       "created_at": "2026-10-27T19:12:01.614Z"
+    },
+    {
+      "id": "mat-mvr2xl3s-cc69093a",
+      "subject": "ТЕСТ файла — удалить",
+      "work": "Проверка загрузки файла",
+      "programs": [
+        "ai"
+      ],
+      "course_year": 1,
+      "semester": null,
+      "teacher": null,
+      "score": null,
+      "stack": [],
+      "tip": "Тестовая заявка от Claude: проверка файла.",
+      "links": [
+        {
+          "label": "Тест UIB Hub.pdf",
+          "url": "files/mat-mvr2xl3s-cc69093a/test-uib-hub.pdf",
+          "file": true
+        }
+      ],
+      "author": {
+        "display": "Аноним",
+        "anonymous": true
+      },
+      "created_at": "2026-10-27T19:29:35.512Z"
     }
   ]
 }
