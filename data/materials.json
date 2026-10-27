@@ -323,29 +323,6 @@
         "anonymous": true
       },
       "created_at": "2026-10-24T10:00:00+05:00"
-    },
-    {
-      "id": "mat-mvqrk4a0-83f8ebed",
-      "subject": "ТЕСТ — удалить",
-      "work": "Проверка Worker (можно отклонить)",
-      "programs": [
-        "ai"
-      ],
-      "course_year": 3,
-      "semester": null,
-      "teacher": null,
-      "score": {
-        "got": 100,
-        "max": 100
-      },
-      "stack": [],
-      "tip": "Тестовая заявка от Claude для проверки модерации.",
-      "links": [],
-      "author": {
-        "display": "Аноним",
-        "anonymous": true
-      },
-      "created_at": "2026-10-27T14:11:11.400Z"
     }
   ]
 }

@@ -6,7 +6,8 @@
 //                     ❌ удаляет её из очереди
 //
 // Секреты (wrangler secret put): TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, GITHUB_TOKEN
-// Переменные (wrangler.toml):    ALLOWED_ORIGIN, MODERATOR_CHAT_ID, GITHUB_REPO, GITHUB_BRANCH, MATERIALS_PATH
+// Переменные (wrangler.toml):    ALLOWED_ORIGIN, MODERATOR_CHAT_ID, GITHUB_REPO, GITHUB_BRANCH, MATERIALS_PATH,
+//                                COMMIT_NAME, COMMIT_EMAIL
 // KV namespace:                  SUBMISSIONS
 
 const LIMITS = { subject: 120, work: 200, teacher: 80, tip: 1000, stackItems: 12, stackItem: 40, nick: 40, url: 500, programs: 3 };
@@ -223,11 +224,15 @@ async function publishMaterial(env, material) {
     data.materials ??= [];
     if (!data.materials.some((m) => m.id === material.id)) data.materials.push(material);
 
+    // Без явного автора GitHub подставил бы основную почту владельца токена
+    const identity = { name: env.COMMIT_NAME, email: env.COMMIT_EMAIL };
     const res = await githubRaw(env, 'PUT', path, {
       message: `Новая работа: ${material.subject} — ${material.work}`,
       content: toBase64(`${JSON.stringify(data, null, 2)}\n`),
       sha: file.sha,
       branch: env.GITHUB_BRANCH,
+      author: identity,
+      committer: identity,
     });
     if (res.status === 409) continue;
     if (!res.ok) throw new Error(`GitHub ${res.status}`);

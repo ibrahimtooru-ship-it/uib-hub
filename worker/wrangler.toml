@@ -11,6 +11,9 @@ MODERATOR_CHAT_ID = "-5555368205"
 GITHUB_REPO = "ibrahimtooru-ship-it/uib-hub"
 GITHUB_BRANCH = "main"
 MATERIALS_PATH = "data/materials.json"
+# Автор коммитов с одобренными работами (скрытая почта GitHub, настоящая не светится)
+COMMIT_NAME = "UIB Hub"
+COMMIT_EMAIL = "231179946+ibrahimtooru-ship-it@users.noreply.github.com"
 
 [[kv_namespaces]]
 binding = "SUBMISSIONS"
