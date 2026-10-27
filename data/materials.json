@@ -348,6 +348,38 @@
         "anonymous": true
       },
       "created_at": "2026-10-27T19:12:01.614Z"
+    },
+    {
+      "id": "mat-mvr6txio-152118cc",
+      "subject": "Java",
+      "work": "Setter getter",
+      "programs": [
+        "smart-tech"
+      ],
+      "course_year": 3,
+      "semester": null,
+      "teacher": "Aruzhan",
+      "score": {
+        "got": 75,
+        "max": 100
+      },
+      "stack": [
+        "IntelejIdea"
+      ],
+      "tip": "Проверяет жестко насколько ты понимаешь логику кода и данные",
+      "links": [
+        {
+          "label": "camphoto_824023566.jpeg",
+          "file": true,
+          "size": 8604158
+        }
+      ],
+      "author": {
+        "display": "kuruta",
+        "anonymous": false,
+        "avatar": "it"
+      },
+      "created_at": "2026-10-27T21:18:43.440Z"
     }
   ]
 }
