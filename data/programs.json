@@ -1,47 +1,41 @@
 {
-  "version": 2,
-  "note": "Коды ОП временные (slug). Когда появятся официальные шифры UIB (6B…), заменить code здесь и в materials.json. Группировка по направлениям сделана для удобства фильтра, а не по официальным школам.",
+  "version": 3,
+  "note": "Группировка по кафедрам UIB. Коды ОП временные (slug); если появятся официальные шифры (6B…), заменить code здесь и в materials.json.",
   "directions": [
-    { "id": "it", "name": "IT и данные", "emoji": "robot" },
-    { "id": "intl", "name": "Международные отношения", "emoji": "globe" },
-    { "id": "media", "name": "Медиа и PR", "emoji": "newspaper" },
-    { "id": "psy", "name": "Психология", "emoji": "brain" },
-    { "id": "law", "name": "Право", "emoji": "scales" },
-    { "id": "marketing", "name": "Маркетинг", "emoji": "bar_chart" },
-    { "id": "management", "name": "Менеджмент и бизнес", "emoji": "briefcase" },
-    { "id": "logistics", "name": "Логистика", "emoji": "truck" },
-    { "id": "finance", "name": "Финансы и учёт", "emoji": "money_bag" }
+    { "id": "mib", "short": "МиБ", "name": "Менеджмент и бизнес", "emoji": "briefcase" },
+    { "id": "bi", "short": "БИ", "name": "Бизнес-информатика", "emoji": "robot" },
+    { "id": "fiu", "short": "ФиУ", "name": "Финансы и учёт", "emoji": "money_bag" },
+    { "id": "sgn", "short": "СГН", "name": "Социально-гуманитарные науки", "emoji": "brain" },
+    { "id": "tig", "short": "ТиГ", "name": "Туризм и гостеприимство", "emoji": "luggage" }
   ],
   "programs": [
-    { "code": "ai", "name": "Искусственный интеллект", "short": "ИИ", "direction": "it", "emoji": "robot" },
-    { "code": "big-data", "name": "Аналитика Big Data", "short": "Big Data", "direction": "it", "emoji": "floppy" },
-    { "code": "smart-tech", "name": "Smart-технологии", "short": "Smart", "direction": "it", "emoji": "gear" },
+    { "code": "management", "name": "Менеджмент", "short": "Менеджмент", "direction": "mib", "emoji": "briefcase" },
+    { "code": "business-admin", "name": "Бизнес-администрирование", "short": "Бизнес-админ.", "direction": "mib", "emoji": "office" },
+    { "code": "econ-mgmt", "name": "Экономика и менеджмент", "short": "ЭиМ", "direction": "mib", "emoji": "chart_up" },
+    { "code": "art-mgmt", "name": "Арт-менеджмент", "short": "Арт-менеджмент", "direction": "mib", "emoji": "arts" },
+    { "code": "logistics-mgmt", "name": "Организация и управление логистикой", "short": "Логистика", "direction": "mib", "emoji": "package" },
+    { "code": "intl-logistics", "name": "Международная бизнес-логистика", "short": "МБЛ", "direction": "mib", "emoji": "plane" },
+    { "code": "mkt-research", "name": "Маркетинговые исследования и анализ", "short": "МИА", "direction": "mib", "emoji": "bar_chart" },
+    { "code": "digital-mkt", "name": "Маркетинг в цифровой экономике", "short": "МЦЭ", "direction": "mib", "emoji": "shopping" },
 
-    { "code": "intl-analytics", "name": "Международная аналитика", "short": "МА", "direction": "intl", "emoji": "globe" },
+    { "code": "ai", "name": "Искусственный интеллект", "short": "ИИ", "direction": "bi", "emoji": "robot" },
+    { "code": "big-data", "name": "Аналитика Big Data", "short": "Big Data", "direction": "bi", "emoji": "floppy" },
+    { "code": "smart-tech", "name": "Smart-технологии", "short": "Smart", "direction": "bi", "emoji": "gear" },
+    { "code": "digital-marketing", "name": "Digital Marketing", "short": "Digital Marketing", "direction": "bi", "emoji": "phone" },
 
-    { "code": "conv-journalism", "name": "Конвергентная журналистика", "short": "Журналистика", "direction": "media", "emoji": "newspaper" },
-    { "code": "ad-pr", "name": "Реклама и PR", "short": "Реклама и PR", "direction": "media", "emoji": "megaphone" },
+    { "code": "acca", "name": "Учёт и аудит по ACCA", "short": "ACCA", "direction": "fiu", "emoji": "abacus" },
+    { "code": "fin-markets", "name": "Финансовые рынки и финансовые институты", "short": "ФРиФИ", "direction": "fiu", "emoji": "bank" },
+    { "code": "corp-finance", "name": "Корпоративные финансы", "short": "Корп. финансы", "direction": "fiu", "emoji": "money_bag" },
 
-    { "code": "uspp", "name": "Управление социально-психологическими процессами", "short": "УСПП", "direction": "psy", "emoji": "busts" },
-    { "code": "porl", "name": "Психологические особенности развития личности", "short": "ПОРЛ", "direction": "psy", "emoji": "brain" },
+    { "code": "uspp", "name": "Управление социально-психологическими процессами", "short": "УСПП", "direction": "sgn", "emoji": "busts" },
+    { "code": "porl", "name": "Психологические особенности развития личности", "short": "ПОРЛ", "direction": "sgn", "emoji": "brain" },
+    { "code": "conv-journalism", "name": "Конвергентная журналистика", "short": "Журналистика", "direction": "sgn", "emoji": "newspaper" },
+    { "code": "ad-pr", "name": "Реклама и PR", "short": "Реклама и PR", "direction": "sgn", "emoji": "megaphone" },
+    { "code": "intl-analytics", "name": "Международная аналитика", "short": "МА", "direction": "sgn", "emoji": "globe" },
+    { "code": "law", "name": "Юриспруденция", "short": "Юриспруденция", "direction": "sgn", "emoji": "scales" },
+    { "code": "intl-econ-law", "name": "Международное экономическое право", "short": "МЭП", "direction": "sgn", "emoji": "classical" },
 
-    { "code": "law", "name": "Юриспруденция", "short": "Юриспруденция", "direction": "law", "emoji": "scales" },
-    { "code": "intl-econ-law", "name": "Международное экономическое право", "short": "МЭП", "direction": "law", "emoji": "classical" },
-
-    { "code": "mkt-research", "name": "Маркетинговые исследования и анализ", "short": "МИА", "direction": "marketing", "emoji": "bar_chart" },
-    { "code": "digital-mkt", "name": "Маркетинг в цифровой экономике", "short": "МЦЭ", "direction": "marketing", "emoji": "shopping" },
-    { "code": "digital-marketing", "name": "Digital Marketing", "short": "Digital Marketing", "direction": "marketing", "emoji": "phone" },
-
-    { "code": "management", "name": "Менеджмент", "short": "Менеджмент", "direction": "management", "emoji": "briefcase" },
-    { "code": "business-admin", "name": "Бизнес-администрирование", "short": "Бизнес-админ.", "direction": "management", "emoji": "office" },
-    { "code": "econ-mgmt", "name": "Экономика и менеджмент", "short": "ЭиМ", "direction": "management", "emoji": "chart_up" },
-    { "code": "art-mgmt", "name": "Арт-менеджмент", "short": "Арт-менеджмент", "direction": "management", "emoji": "arts" },
-
-    { "code": "logistics-mgmt", "name": "Организация и управление логистикой", "short": "Логистика", "direction": "logistics", "emoji": "package" },
-    { "code": "intl-logistics", "name": "Международная бизнес-логистика", "short": "МБЛ", "direction": "logistics", "emoji": "plane" },
-
-    { "code": "acca", "name": "Учёт и аудит по ACCA", "short": "ACCA", "direction": "finance", "emoji": "abacus" },
-    { "code": "fin-markets", "name": "Финансовые рынки и финансовые институты", "short": "ФРиФИ", "direction": "finance", "emoji": "bank" },
-    { "code": "corp-finance", "name": "Корпоративные финансы", "short": "Корп. финансы", "direction": "finance", "emoji": "money_bag" }
+    { "code": "sustainable-tourism", "name": "Устойчивый туризм", "short": "Устойчивый туризм", "direction": "tig", "emoji": "tree" },
+    { "code": "hospitality-mgmt", "name": "Менеджмент гостеприимства", "short": "Гостеприимство", "direction": "tig", "emoji": "bellhop" }
   ]
 }

@@ -1,3 +1,4 @@
+import { api, requireLogin } from './auth.js';
 import { CONFIG } from './config.js';
 import { emoji, subjectEmoji } from './emoji.js';
 import { escapeHtml, fetchJson, formatRelative, safeUrl } from './utils.js';
@@ -65,7 +66,40 @@ export async function initMaterials() {
   render();
 }
 
+async function downloadFile(button) {
+  if (!(await requireLogin('Чтобы скачать файл, войди в аккаунт.'))) return;
+  const label = button.querySelector('span');
+  const text = label.textContent;
+  button.disabled = true;
+  label.textContent = 'Скачиваю…';
+  try {
+    const res = await api(`/files/${encodeURIComponent(button.dataset.download)}`);
+    if (res.status === 401) {
+      label.textContent = text;
+      button.disabled = false;
+      return downloadFile(button); // сессия истекла — войти и повторить
+    }
+    if (!res.ok) throw new Error(res.status === 404 ? 'Файл не найден' : `HTTP ${res.status}`);
+    const url = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement('a'), { href: url, download: button.dataset.name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    label.textContent = text;
+  } catch (err) {
+    console.error(err);
+    label.textContent = err.message === 'Файл не найден' ? err.message : 'Не получилось, ещё раз';
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function bindEvents() {
+  el.grid.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-download]');
+    if (button) downloadFile(button);
+  });
   el.search.addEventListener('input', () => { state.query = el.search.value.trim().toLowerCase(); render(); });
   el.subject.addEventListener('change', () => { state.subject = el.subject.value; render(); });
   el.teacher.addEventListener('change', () => { state.teacher = el.teacher.value; render(); });
@@ -164,11 +198,11 @@ function renderDirections() {
   };
 
   el.directions.innerHTML = [
-    tile('', 'Все направления', `${state.items.length} работ`, 'cap'),
+    tile('', 'Все кафедры', `${state.items.length} работ`, 'cap'),
     ...state.directions.map((d) => {
       const programs = [...state.programs.values()].filter((p) => p.direction === d.id).length;
       const works = state.items.filter((m) => inDirection(m, d.id)).length;
-      return tile(d.id, d.name, `${programs} ОП · ${works} работ`, d.emoji);
+      return tile(d.id, d.name, `${d.short ? `${d.short} · ` : ''}${programs} ОП · ${works} работ`, d.emoji);
     }),
   ].join('');
 }
@@ -272,16 +306,15 @@ function scoreRing(m) {
     </div>`;
 }
 
-// Файл, загруженный через форму, лежит в репозитории (files/…) — его скачиваем, ссылки открываем
-function linkButton(link) {
-  const href = escapeHtml(safeUrl(link.url));
+// Файл работы хранится закрыто в Worker'е и скачивается только после входа; обычные ссылки просто открываем
+function linkButton(link, materialId) {
   const label = escapeHtml(link.label);
   if (link.file) {
-    // download с именем: файл сохранится как «Отчёт по ООП.pdf», а не как имя из пути
-    return `<a href="${href}" download="${label}" title="${label}" class="inline-flex max-w-[14rem] items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 transition hover:bg-emerald-100">
+    return `<button type="button" data-download="${escapeHtml(materialId)}" data-name="${label}" title="${label}" class="inline-flex max-w-[14rem] items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60">
       <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
-      <span class="truncate">${label}</span></a>`;
+      <span class="truncate">${label}</span></button>`;
   }
+  const href = escapeHtml(safeUrl(link.url));
   return `<a href="${href}" target="_blank" rel="noopener" title="${label}" class="inline-flex max-w-[14rem] items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-brand-700 transition hover:bg-brand-100">${emoji('paperclip', 14)}<span class="truncate">${label}</span></a>`;
 }
 
@@ -321,7 +354,7 @@ export function materialCard(m) {
         <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs font-semibold text-slate-500">
           <span class="flex items-center gap-1.5">${author}${Number.isNaN(created.getTime()) ? '' : `<span class="text-slate-300">·</span><span class="font-medium">${formatRelative(created)}</span>`}</span>
           <span class="flex min-w-0 flex-wrap gap-1.5">
-            ${(m.links ?? []).map(linkButton).join('')}
+            ${(m.links ?? []).map((link) => linkButton(link, m.id)).join('')}
           </span>
         </div>
       </footer>

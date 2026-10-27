@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>UIB Hub</title>
   <meta name="description" content="База знаний студентов UIB: работы, баллы, советы. Плюс дедлайны Academo и маркетплейс услуг.">
+  <!-- Иконка и режим приложения: после «На экран Домой» сайт открывается без адресной строки -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="UIB Hub">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
@@ -102,6 +111,7 @@
     </nav>
 
     <div class="space-y-3 p-4">
+      <div data-account="full"></div>
       <div id="sidebar-deadline"></div>
       <button type="button" data-open-submit class="btn-primary w-full"><span data-emoji="sparkles" data-size="18"></span>Поделиться работой</button>
     </div>
@@ -115,6 +125,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
       <span class="font-display font-semibold text-slate-900">UIB Hub</span>
+      <div class="ml-auto" data-account="compact"></div>
     </header>
 
     <main class="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-10">
@@ -138,8 +149,8 @@
 
         <div class="mt-10 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 class="font-display text-lg font-semibold text-slate-900">Направления и программы</h2>
-            <p class="text-sm text-slate-500">Выбери направление, затем свою ОП, чтобы видеть только релевантные работы</p>
+            <h2 class="font-display text-lg font-semibold text-slate-900">Кафедры и программы</h2>
+            <p class="text-sm text-slate-500">Выбери кафедру, затем свою ОП, чтобы видеть только релевантные работы</p>
           </div>
           <button type="button" data-open-submit class="btn-secondary"><span data-emoji="inbox" data-size="18"></span>Добавить работу</button>
         </div>
@@ -404,11 +415,11 @@
           <label class="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-700"><span>Или ссылка <span class="font-normal text-slate-400">— необязательно</span></span>
             <input name="link" type="url" inputmode="url" class="input font-normal" placeholder="https://…">
           </label>
-          <div class="flex min-w-0 items-center gap-3">
+          <div class="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-slate-50 p-3">
             <label class="inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
               <input name="anonymous" type="checkbox" checked class="h-5 w-5 accent-brand-600"> Анонимно
             </label>
-            <input name="nick" class="input min-w-0 flex-1 font-normal disabled:bg-slate-50" placeholder="или твой ник" disabled>
+            <span id="submit-author" class="min-w-0 truncate text-xs text-slate-500"></span>
           </div>
           <!-- Ловушка для ботов: человек это поле не видит и не заполняет -->
           <input name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" class="absolute -left-[9999px] h-px w-px opacity-0">
@@ -434,6 +445,48 @@
           <button type="button" data-close class="btn-ghost">Закрыть</button>
         </div>
       </div>
+    </div>
+  </dialog>
+
+  <!-- Вход и регистрация -->
+  <dialog id="auth-dialog" class="sheet w-[min(440px,calc(100vw-32px))]">
+    <div class="p-4 sm:p-6">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-3">
+          <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-50" data-emoji="key" data-size="30"></span>
+          <div class="min-w-0">
+            <h2 id="auth-title" class="font-display text-lg font-semibold text-slate-900">Вход</h2>
+            <p id="auth-reason" class="text-sm text-slate-500"></p>
+          </div>
+        </div>
+        <button type="button" data-close class="btn-ghost -mr-2 -mt-1 shrink-0" aria-label="Закрыть">✕</button>
+      </div>
+
+      <div id="auth-tabs" class="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" role="group" aria-label="Вход или регистрация">
+        <button type="button" data-mode="login" class="seg">Вход</button>
+        <button type="button" data-mode="register" class="seg">Регистрация</button>
+      </div>
+
+      <form id="auth-form" class="mt-4 grid gap-3" novalidate>
+        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Баркод
+          <input name="barcode" inputmode="numeric" autocomplete="username" maxlength="10" class="input font-normal" placeholder="Цифры со студенческого, как в Academo">
+        </label>
+        <label data-register class="grid gap-1.5 text-sm font-semibold text-slate-700">Никнейм
+          <input name="nickname" autocomplete="nickname" maxlength="24" class="input font-normal" placeholder="Так будут подписаны твои работы">
+        </label>
+        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Пароль
+          <input name="password" type="password" autocomplete="current-password" class="input font-normal">
+        </label>
+        <label data-register class="grid gap-1.5 text-sm font-semibold text-slate-700">Повтори пароль
+          <input name="password2" type="password" autocomplete="new-password" class="input font-normal">
+        </label>
+        <div data-register class="flex gap-2.5 rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-100">
+          <span data-emoji="locked" data-size="18"></span>
+          <p>Придумай <b>новый пароль</b> для UIB Hub, не тот, что от Academo. Баркод видят только модераторы, на сайте показывается только ник.</p>
+        </div>
+        <p id="auth-error" class="text-sm font-semibold text-red-600 empty:hidden" aria-live="polite"></p>
+        <button id="auth-submit" type="submit" class="btn-primary disabled:opacity-60">Войти</button>
+      </form>
     </div>
   </dialog>
 

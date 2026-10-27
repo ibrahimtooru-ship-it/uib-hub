@@ -1,3 +1,4 @@
+import { initAuth } from './auth.js';
 import { initDeadlines } from './deadlines.js';
 import { hydrateEmoji } from './emoji.js';
 import { initGuide } from './guide.js';
@@ -55,6 +56,7 @@ document.addEventListener('click', (event) => {
 });
 
 hydrateEmoji();
+initAuth();
 initMarketplace();
 initSubmit();
 window.addEventListener('hashchange', navigate);

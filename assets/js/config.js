@@ -7,12 +7,12 @@ export const CONFIG = {
   TELEGRAM: {
     botUsername: 'uib_hub_mod_bot',   // бот модерации (работает через Worker)
     ordersUsername: 'kuruta06',       // куда уходят заявки маркетплейса «Ищу исполнителя»
-    moderatorUsername: 'kuruta06',    // кому уходят работы, пока SUBMIT_ENDPOINT не задан
+    moderatorUsername: 'kuruta06',    // кому уходят работы, пока API_BASE не задан
   },
 
-  // Worker из папки worker/ (см. worker/README.md): очередь модерации и публикация в materials.json.
-  // null — форма вместо этого собирает готовое сообщение и открывает Telegram модератора.
-  SUBMIT_ENDPOINT: 'https://uib-hub-submit.uibhub.workers.dev/submit',
+  // Worker из папки worker/ (см. worker/README.md): аккаунты, очередь модерации, файлы работ.
+  // null — без аккаунтов: форма собирает готовое сообщение и открывает Telegram модератора.
+  API_BASE: 'https://uib-hub-submit.uibhub.workers.dev',
 
   MARKETPLACE: {
     currency: 'KZT',

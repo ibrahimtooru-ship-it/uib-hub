@@ -1,6 +1,7 @@
 // Форма «Добавить работу» прямо на сайте. Работа не публикуется сразу, а уходит на модерацию:
-// • если задан CONFIG.SUBMIT_ENDPOINT — POST в бэкенд (очередь модерации);
+// • если задан CONFIG.API_BASE — после входа POST в Worker (очередь модерации), автор берётся из аккаунта;
 // • иначе — готовое сообщение модератору в Telegram (одна кнопка «Отправить»).
+import { api, currentUser, onAuthChange, requireLogin } from './auth.js';
 import { CONFIG } from './config.js';
 import { escapeHtml, safeUrl } from './utils.js';
 import { getCatalog, materialCard, materialsReady } from './materials.js';
@@ -18,6 +19,7 @@ const SERVER_ERRORS = {
   subject_and_work_required: 'Укажи предмет и название работы.',
   program_required: 'Выбери свою ОП.',
   forbidden: 'Отправка с этого адреса не разрешена.',
+  auth_required: 'Сессия закончилась. Войди заново и отправь ещё раз.',
   file_type: `Такой тип файла не подходит. Можно: ${FILE_HINT}.`,
   file_too_big: 'Файл больше 10 МБ. Сожми его или загрузи в ZIP.',
 };
@@ -35,6 +37,7 @@ export function initSubmit() {
   el.fileName = document.getElementById('submit-file-name');
   el.fileHint = document.getElementById('submit-file-hint');
   el.fileClear = document.getElementById('submit-file-clear');
+  el.author = document.getElementById('submit-author');
   initFilePicker();
 
   document.addEventListener('click', (event) => {
@@ -45,9 +48,14 @@ export function initSubmit() {
   });
   el.form.addEventListener('input', renderPreview);
   el.form.addEventListener('submit', onSubmit);
-  el.form.elements.anonymous.addEventListener('change', () => {
-    el.form.elements.nick.disabled = el.form.elements.anonymous.checked;
-  });
+  el.form.elements.anonymous.addEventListener('change', renderAuthor);
+  onAuthChange(renderAuthor);
+}
+
+function renderAuthor() {
+  const user = currentUser();
+  const anonymous = el.form.elements.anonymous.checked || !user;
+  el.author.textContent = anonymous ? 'Подпись на сайте: Аноним' : `Подпись на сайте: ${user.nickname}`;
 }
 
 function initFilePicker() {
@@ -96,7 +104,9 @@ function setFile(file) {
 }
 
 async function open() {
+  if (CONFIG.API_BASE && !(await requireLogin('Чтобы добавить работу, войди в аккаунт. Ник подставится сам.'))) return;
   await materialsReady;
+  renderAuthor();
   fillOptions();
   showForm(true);
   el.dialog.showModal();
@@ -123,7 +133,8 @@ function readMaterial() {
   const got = f.got.value === '' ? null : Number(f.got.value);
   const max = Number(f.max.value) || 100;
   const link = f.link.value.trim();
-  const anonymous = f.anonymous.checked || !f.nick.value.trim();
+  const user = currentUser();
+  const anonymous = f.anonymous.checked || !user;
   return {
     id: `pending-${Date.now().toString(36)}`,
     subject: f.subject.value.trim(),
@@ -136,7 +147,7 @@ function readMaterial() {
     stack: f.stack.value.split(',').map((s) => s.trim()).filter(Boolean),
     tip: f.tip.value.trim(),
     links: link ? [{ label: 'Материалы', url: link }] : [],
-    author: anonymous ? { display: 'Аноним', anonymous: true } : { display: f.nick.value.trim(), anonymous: false },
+    author: anonymous ? { display: 'Аноним', anonymous: true } : { display: user.nickname, anonymous: false },
     created_at: new Date().toISOString(),
   };
 }
@@ -156,8 +167,8 @@ function renderPreview() {
     ...m,
     subject: m.subject || 'Предмет',
     work: m.work || 'Название работы',
-    // Настоящую ссылку на файл Worker поставит при публикации
-    links: file ? [{ label: file.name, url: '#', file: true }, ...m.links] : m.links,
+    // Файл появится у работы после публикации; скачать его можно будет только после входа
+    links: file ? [{ label: file.name, file: true, size: file.size }, ...m.links] : m.links,
   });
 }
 
@@ -168,7 +179,7 @@ async function onSubmit(event) {
   el.error.textContent = problem;
   if (problem) return;
 
-  if (CONFIG.SUBMIT_ENDPOINT) {
+  if (CONFIG.API_BASE) {
     const button = el.form.querySelector('[type="submit"]');
     const label = button.textContent;
     const file = el.form.elements.file.files[0];
@@ -180,7 +191,7 @@ async function onSubmit(event) {
     body.set('payload', JSON.stringify({ type: 'material', data: material, website: el.form.elements.website.value }));
     if (file) body.set('file', file, file.name);
     try {
-      const res = await fetch(CONFIG.SUBMIT_ENDPOINT, { method: 'POST', body });
+      const res = await api('/submit', { method: 'POST', body });
       if (res.ok) {
         el.form.reset();
         setFile(null);

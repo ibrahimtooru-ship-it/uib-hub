@@ -75,6 +75,9 @@ export const EMOJI = {
   wifi: ['Wireless', '🛜'],
   food: ['Fork and knife with plate', '🍽️'],
   coffee: ['Hot beverage', '☕'],
+  luggage: ['Luggage', '🧳'],
+  bellhop: ['Bellhop bell', '🛎️'],
+  tree: ['Deciduous tree', '🌳'],
 };
 
 export function emoji(name, size = 24, className = '') {
