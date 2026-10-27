@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "note": "Коды ОП временные (slug). Когда появятся официальные шифры UIB (6B…), заменить code здесь и в materials.json. Группировка по направлениям сделана для удобства фильтра, а не по официальным школам.",
+  "directions": [
+    { "id": "it", "name": "IT и данные", "emoji": "robot" },
+    { "id": "intl", "name": "Международные отношения", "emoji": "globe" },
+    { "id": "media", "name": "Медиа и PR", "emoji": "newspaper" },
+    { "id": "psy", "name": "Психология", "emoji": "brain" },
+    { "id": "law", "name": "Право", "emoji": "scales" },
+    { "id": "marketing", "name": "Маркетинг", "emoji": "bar_chart" },
+    { "id": "management", "name": "Менеджмент и бизнес", "emoji": "briefcase" },
+    { "id": "logistics", "name": "Логистика", "emoji": "truck" },
+    { "id": "finance", "name": "Финансы и учёт", "emoji": "money_bag" }
+  ],
+  "programs": [
+    { "code": "ai", "name": "Искусственный интеллект", "short": "ИИ", "direction": "it", "emoji": "robot" },
+    { "code": "big-data", "name": "Аналитика Big Data", "short": "Big Data", "direction": "it", "emoji": "floppy" },
+    { "code": "smart-tech", "name": "Smart-технологии", "short": "Smart", "direction": "it", "emoji": "gear" },
+
+    { "code": "intl-analytics", "name": "Международная аналитика", "short": "МА", "direction": "intl", "emoji": "globe" },
+
+    { "code": "conv-journalism", "name": "Конвергентная журналистика", "short": "Журналистика", "direction": "media", "emoji": "newspaper" },
+    { "code": "ad-pr", "name": "Реклама и PR", "short": "Реклама и PR", "direction": "media", "emoji": "megaphone" },
+
+    { "code": "uspp", "name": "Управление социально-психологическими процессами", "short": "УСПП", "direction": "psy", "emoji": "busts" },
+    { "code": "porl", "name": "Психологические особенности развития личности", "short": "ПОРЛ", "direction": "psy", "emoji": "brain" },
+
+    { "code": "law", "name": "Юриспруденция", "short": "Юриспруденция", "direction": "law", "emoji": "scales" },
+    { "code": "intl-econ-law", "name": "Международное экономическое право", "short": "МЭП", "direction": "law", "emoji": "classical" },
+
+    { "code": "mkt-research", "name": "Маркетинговые исследования и анализ", "short": "МИА", "direction": "marketing", "emoji": "bar_chart" },
+    { "code": "digital-mkt", "name": "Маркетинг в цифровой экономике", "short": "МЦЭ", "direction": "marketing", "emoji": "shopping" },
+    { "code": "digital-marketing", "name": "Digital Marketing", "short": "Digital Marketing", "direction": "marketing", "emoji": "phone" },
+
+    { "code": "management", "name": "Менеджмент", "short": "Менеджмент", "direction": "management", "emoji": "briefcase" },
+    { "code": "business-admin", "name": "Бизнес-администрирование", "short": "Бизнес-админ.", "direction": "management", "emoji": "office" },
+    { "code": "econ-mgmt", "name": "Экономика и менеджмент", "short": "ЭиМ", "direction": "management", "emoji": "chart_up" },
+    { "code": "art-mgmt", "name": "Арт-менеджмент", "short": "Арт-менеджмент", "direction": "management", "emoji": "arts" },
+
+    { "code": "logistics-mgmt", "name": "Организация и управление логистикой", "short": "Логистика", "direction": "logistics", "emoji": "package" },
+    { "code": "intl-logistics", "name": "Международная бизнес-логистика", "short": "МБЛ", "direction": "logistics", "emoji": "plane" },
+
+    { "code": "acca", "name": "Учёт и аудит по ACCA", "short": "ACCA", "direction": "finance", "emoji": "abacus" },
+    { "code": "fin-markets", "name": "Финансовые рынки и финансовые институты", "short": "ФРиФИ", "direction": "finance", "emoji": "bank" },
+    { "code": "corp-finance", "name": "Корпоративные финансы", "short": "Корп. финансы", "direction": "finance", "emoji": "money_bag" }
+  ]
+}

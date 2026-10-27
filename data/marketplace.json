@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "listings": [
+    {
+      "id": "lst-001",
+      "kind": "offer",
+      "category": "presentation",
+      "title": "Презентации в Figma / PowerPoint за 24 часа",
+      "description": "Структура, дизайн, иконки. Текст от вас или помогу собрать.",
+      "subjects": ["Маркетинг", "Менеджмент"],
+      "pricing": { "currency": "KZT", "price": 5000, "price_type": "from", "service_fee_percent": 0, "total_amount": 5000 },
+      "contact": { "telegram": "example_designer" },
+      "payment_mode": "p2p",
+      "status": "active",
+      "created_at": "2026-10-25T10:00:00+05:00"
+    },
+    {
+      "id": "lst-002",
+      "kind": "offer",
+      "category": "tutoring",
+      "title": "Репетитор по Python и алгоритмам",
+      "description": "Разберу лабы и подготовлю к рубежке. Онлайн или в кампусе.",
+      "subjects": ["Программирование на Python"],
+      "pricing": { "currency": "KZT", "price": 4000, "price_type": "per_hour", "service_fee_percent": 0, "total_amount": 4000 },
+      "contact": { "telegram": "example_tutor" },
+      "payment_mode": "p2p",
+      "status": "active",
+      "created_at": "2026-10-20T15:00:00+05:00"
+    },
+    {
+      "id": "lst-003",
+      "kind": "request",
+      "category": "notes",
+      "title": "Нужен конспект лекций 5–8 по финучёту",
+      "description": "Рукописный или печатный, главное — понятно.",
+      "subjects": ["Финансовый учёт"],
+      "pricing": { "currency": "KZT", "price": 3000, "price_type": "fixed", "service_fee_percent": 0, "total_amount": 3000 },
+      "contact": { "telegram": "example_student" },
+      "payment_mode": "p2p",
+      "status": "active",
+      "created_at": "2026-10-26T21:00:00+05:00"
+    }
+  ]
+}

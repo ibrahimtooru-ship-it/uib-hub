@@ -1,0 +1,9 @@
+# Wrangler / Node
+node_modules/
+worker/.wrangler/
+worker/.dev.vars
+.env
+
+# Системные файлы
+.DS_Store
+Thumbs.db

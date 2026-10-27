@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UIB Hub</title>
+  <meta name="description" content="База знаний студентов UIB: работы, баллы, советы. Плюс дедлайны Academo и маркетплейс услуг.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'system-ui', 'sans-serif'],
+            display: ['Unbounded', 'Manrope', 'sans-serif'],
+          },
+          colors: {
+            brand: { 50: '#f4f1ff', 100: '#ebe5ff', 200: '#d6ccff', 400: '#8f72ff', 500: '#6d4aff', 600: '#5b35f5', 700: '#4c28d9' },
+            canvas: '#f6f5fb',
+          },
+        },
+      },
+    };
+  </script>
+  <style type="text/tailwindcss">
+    /* В слое components, чтобы утилиты вроде .hidden перебивали эти стили */
+    @layer components {
+      .nav-item { @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900; }
+      .nav-item.is-active { @apply bg-brand-50 text-brand-700 ring-1 ring-brand-100; }
+      .nav-label { @apply px-3 pb-1 pt-5 text-[11px] font-bold uppercase tracking-wider text-slate-400; }
+      .card { @apply rounded-2xl bg-white ring-1 ring-slate-200/80 shadow-[0_1px_2px_rgba(16,24,40,0.04)]; }
+      .input { @apply rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-100; }
+      .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-brand-600/25 transition hover:bg-brand-700; }
+      .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50; }
+      .btn-ghost { @apply inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900; }
+      .chip { @apply rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 transition hover:ring-slate-300; }
+      .chip.is-active { @apply bg-slate-900 text-white ring-slate-900; }
+      .seg { @apply rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-900; }
+      .seg.is-active { @apply bg-brand-600 text-white shadow-sm; }
+      .page-title { @apply font-display text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl; }
+    }
+
+    @keyframes critical-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgb(239 68 68 / 0.35); }
+      50% { box-shadow: 0 0 0 8px rgb(239 68 68 / 0); }
+    }
+    .pulse-critical { animation: critical-glow 1.8s ease-in-out infinite; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(-6deg); }
+      50% { transform: translateY(-10px) rotate(-2deg); }
+    }
+    .float { animation: float 6s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) {
+      .pulse-critical, .animate-ping, .float { animation: none; }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-canvas font-sans text-slate-800 antialiased">
+  <!-- САЙДБАР -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200/80 bg-white transition-transform duration-200 lg:translate-x-0" aria-label="Главное меню">
+    <a href="#/knowledge" class="flex items-center gap-3 px-6 pb-4 pt-6">
+      <span class="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-fuchsia-500 shadow-lg shadow-brand-500/30" data-emoji="cap" data-size="28"></span>
+      <span>
+        <span class="block font-display text-lg font-semibold leading-none text-slate-900">UIB Hub</span>
+        <span class="text-xs font-medium text-slate-400">студенческий хаб</span>
+      </span>
+    </a>
+
+    <nav class="flex-1 overflow-y-auto px-3">
+      <div class="nav-label">Учёба</div>
+      <a class="nav-item" data-route="knowledge" href="#/knowledge"><span data-emoji="books" data-size="22"></span>База знаний<span id="nav-count-knowledge" class="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"></span></a>
+      <a class="nav-item" data-route="guide" href="#/guide"><span data-emoji="backpack" data-size="22"></span>Памятка первокурсника</a>
+      <a class="nav-item" data-route="teachers" href="#/teachers"><span data-emoji="shush" data-size="22"></span>Препод-конфиденциально</a>
+      <a class="nav-item" data-route="deadlines" href="#/deadlines"><span data-emoji="alarm" data-size="22"></span>Дедлайны<span id="nav-badge-deadlines" class="ml-auto hidden rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white"></span></a>
+
+      <div class="nav-label">Сервисы</div>
+      <a class="nav-item" data-route="marketplace" href="#/marketplace"><span data-emoji="shopping" data-size="22"></span>Маркетплейс</a>
+      <a class="nav-item" data-route="utils" href="#/utils"><span data-emoji="tools" data-size="22"></span>Утилиты</a>
+
+      <div class="nav-label">Отдых</div>
+      <a class="nav-item" data-route="memes" href="#/memes"><span data-emoji="skull" data-size="22"></span>Биржа мемов</a>
+    </nav>
+
+    <div class="space-y-3 p-4">
+      <div id="sidebar-deadline"></div>
+      <button type="button" data-open-submit class="btn-primary w-full"><span data-emoji="sparkles" data-size="18"></span>Поделиться работой</button>
+    </div>
+  </aside>
+  <div id="sidebar-overlay" class="fixed inset-0 z-30 hidden bg-slate-900/40 backdrop-blur-sm lg:hidden"></div>
+
+  <div class="lg:pl-72">
+    <!-- Мобильная шапка -->
+    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
+      <button id="sidebar-open" type="button" class="grid h-10 w-10 place-items-center rounded-xl ring-1 ring-slate-200" aria-label="Открыть меню" aria-controls="sidebar" aria-expanded="false">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <span class="font-display font-semibold text-slate-900">UIB Hub</span>
+    </header>
+
+    <main class="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-10">
+      <!-- БАЗА ЗНАНИЙ (главная) -->
+      <section data-page="knowledge">
+        <div class="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-brand-600 via-violet-600 to-fuchsia-500 p-6 text-white shadow-xl shadow-brand-600/20 sm:p-10">
+          <div class="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl"></div>
+          <div class="float pointer-events-none absolute right-8 top-8 hidden md:block" data-emoji="books" data-size="150"></div>
+          <div class="float pointer-events-none absolute bottom-6 right-44 hidden opacity-90 lg:block" data-emoji="trophy" data-size="70"></div>
+
+          <p class="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur"><span data-emoji="sparkles" data-size="16"></span>by kuruta</p>
+          <h1 class="mt-4 max-w-xl font-display text-3xl font-semibold leading-tight sm:text-4xl">Как сдавали, на сколько и чем пользовались</h1>
+          <p class="mt-3 max-w-lg text-white/80">Реальные работы с баллами, стеком и советами для твоей образовательной программы.</p>
+
+          <div class="relative mt-6 max-w-xl">
+            <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" data-emoji="search" data-size="22"></span>
+            <input id="kb-search" type="search" placeholder="Python, Figma, отчёт по сетям…" class="w-full rounded-2xl border-0 bg-white py-4 pl-12 pr-4 text-[15px] text-slate-900 shadow-xl outline-none ring-4 ring-white/20 placeholder:text-slate-400 focus:ring-white/50">
+          </div>
+          <dl id="kb-stats" class="mt-6 grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-4"></dl>
+        </div>
+
+        <div class="mt-10 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 class="font-display text-lg font-semibold text-slate-900">Направления и программы</h2>
+            <p class="text-sm text-slate-500">Выбери направление, затем свою ОП, чтобы видеть только релевантные работы</p>
+          </div>
+          <button type="button" data-open-submit class="btn-secondary"><span data-emoji="inbox" data-size="18"></span>Добавить работу</button>
+        </div>
+        <div id="kb-directions" class="-mx-1 mt-4 flex gap-3 overflow-x-auto px-1 pb-2"></div>
+        <div id="kb-programs" class="mt-3 flex flex-wrap gap-2 empty:hidden"></div>
+
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <div id="kb-years" class="inline-flex rounded-xl bg-white p-1 ring-1 ring-slate-200" role="group" aria-label="Курс"></div>
+          <select id="kb-subject" class="input" aria-label="Предмет"><option value="">Все предметы</option></select>
+          <select id="kb-teacher" class="input hidden" aria-label="Преподаватель"><option value="">Все преподаватели</option></select>
+          <select id="kb-sort" class="input" aria-label="Сортировка">
+            <option value="new">Сначала новые</option>
+            <option value="score">Сначала высокий балл</option>
+          </select>
+          <button id="kb-reset" type="button" class="btn-ghost hidden">Сбросить фильтры</button>
+        </div>
+        <div id="kb-tools" class="mt-4 flex flex-wrap gap-2" aria-label="Инструменты"></div>
+
+        <p id="kb-count" class="mt-8 text-sm font-semibold text-slate-500"></p>
+        <div id="kb-grid" class="mt-3 grid gap-5 md:grid-cols-2 xl:grid-cols-3"></div>
+      </section>
+
+      <!-- ПАМЯТКА ПЕРВОКУРСНИКА -->
+      <section data-page="guide" hidden>
+        <div class="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-amber-300 via-orange-400 to-pink-500 p-6 text-white shadow-xl shadow-orange-400/20 sm:p-10">
+          <div class="float pointer-events-none absolute right-8 top-6 hidden md:block" data-emoji="backpack" data-size="140"></div>
+          <p class="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur"><span data-emoji="sparkles" data-size="16"></span>Для 1 курса</p>
+          <h1 class="mt-4 max-w-xl font-display text-3xl font-semibold leading-tight sm:text-4xl">Памятка первокурсника</h1>
+          <p class="mt-3 max-w-lg text-white/90">Силлабус, рубежки, GPA, пересдачи, календарь и кабинеты — простыми словами по путеводителю UIB.</p>
+          <nav class="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
+            <a href="#/guide" data-anchor="guide-syllabus" class="rounded-full bg-white/20 px-3 py-1.5 backdrop-blur transition hover:bg-white/30">Силлабус</a>
+            <a href="#/guide" data-anchor="guide-grading" class="rounded-full bg-white/20 px-3 py-1.5 backdrop-blur transition hover:bg-white/30">Оценка</a>
+            <a href="#/guide" data-anchor="guide-gpa" class="rounded-full bg-white/20 px-3 py-1.5 backdrop-blur transition hover:bg-white/30">GPA</a>
+            <a href="#/guide" data-anchor="guide-calendar" class="rounded-full bg-white/20 px-3 py-1.5 backdrop-blur transition hover:bg-white/30">Календарь</a>
+            <a href="#/guide" data-anchor="guide-contacts" class="rounded-full bg-white/20 px-3 py-1.5 backdrop-blur transition hover:bg-white/30">Кабинеты</a>
+            <a href="#/guide" data-anchor="guide-glossary-card" class="rounded-full bg-white/20 px-3 py-1.5 backdrop-blur transition hover:bg-white/30">Словарик</a>
+          </nav>
+        </div>
+
+        <div class="mt-8 grid gap-6 xl:grid-cols-[1fr_340px]">
+          <div id="guide-topics" class="space-y-4"></div>
+
+          <aside class="space-y-6 xl:sticky xl:top-6 xl:self-start">
+            <div class="rounded-2xl bg-amber-50 p-5 ring-1 ring-amber-100">
+              <div class="flex items-center justify-between gap-2">
+                <h2 class="flex items-center gap-2 font-display text-base font-semibold text-slate-900"><span data-emoji="check" data-size="22"></span>Первая неделя</h2>
+                <span id="guide-progress" class="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200"></span>
+              </div>
+              <div id="guide-checklist" class="mt-3 space-y-0.5"></div>
+            </div>
+
+            <div id="guide-grades-card" class="card p-5">
+              <h2 class="flex items-center gap-2 font-display text-base font-semibold text-slate-900"><span data-emoji="hundred" data-size="22"></span>Шкала оценок</h2>
+              <table class="mt-3 w-full text-left text-sm">
+                <thead class="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  <tr><th class="pb-2 pr-3">Буква</th><th class="pb-2 pr-3">%</th><th class="pb-2 pr-3">GPA</th><th class="pb-2">Значение</th></tr>
+                </thead>
+                <tbody id="guide-grades"></tbody>
+              </table>
+            </div>
+          </aside>
+        </div>
+
+        <div id="guide-glossary-card" class="card mt-6 p-5 sm:p-6">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="flex items-center gap-2 font-display text-lg font-semibold text-slate-900"><span data-emoji="open_book" data-size="24"></span>Словарик студента</h2>
+            <input id="guide-glossary-search" type="search" class="input w-full sm:w-64" placeholder="Найти термин…">
+          </div>
+          <dl id="guide-glossary" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></dl>
+        </div>
+
+        <p id="guide-note" class="mt-6 rounded-xl bg-slate-100 p-3 text-xs text-slate-500"></p>
+      </section>
+
+      <!-- ДЕДЛАЙНЫ -->
+      <section data-page="deadlines" hidden>
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 class="page-title">Дедлайны</h1>
+            <p class="mt-1 text-sm text-slate-500">Общие дедлайны группы и твой календарь из Academo</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="group-select" class="input" aria-label="Группа"><option value="">Все группы</option></select>
+            <button id="academo-open" type="button" class="btn-primary"><span data-emoji="clipboard" data-size="18"></span>Вставить из Academo</button>
+            <label class="btn-secondary cursor-pointer">
+              <span data-emoji="calendar" data-size="18"></span>.ics
+              <input id="ics-input" type="file" accept=".ics,text/calendar" class="sr-only">
+            </label>
+            <button id="ics-clear" type="button" class="btn-ghost hidden">Очистить мои</button>
+            <button id="deadlines-restore" type="button" class="btn-ghost hidden"></button>
+          </div>
+        </div>
+
+        <p id="ics-status" class="mt-3 text-sm text-slate-500" aria-live="polite"></p>
+        <div id="deadline-stats" class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
+        <ul id="deadline-list" class="mt-6 space-y-3"></ul>
+
+        <details class="card mt-8 p-5 text-sm text-slate-600">
+          <summary class="cursor-pointer font-semibold text-slate-800">Как перенести свои дедлайны из Academo?</summary>
+          <ol class="mt-3 list-decimal space-y-1 pl-5">
+            <li>Открой <a href="https://uib.academo.kz/student/deadline-calendar" target="_blank" rel="noopener" class="font-semibold text-brand-700 underline">uib.academo.kz → Шкала времени</a>.</li>
+            <li>Нажми Ctrl+A, затем Ctrl+C (на телефоне: «Выделить всё» → «Копировать»).</li>
+            <li>Здесь нажми «Вставить из Academo» и вставь текст.</li>
+          </ol>
+          <p class="mt-2 text-xs text-slate-500">Текст разбирается прямо в твоём браузере и никуда не отправляется. Пароль от Academo вводить не нужно.</p>
+        </details>
+      </section>
+
+      <!-- МАРКЕТПЛЕЙС (этап 3: пока только форма заявки) -->
+      <section data-page="marketplace" hidden>
+        <h1 class="page-title">Маркетплейс</h1>
+        <p class="mt-1 text-sm text-slate-500">Лента «Ищу исполнителя / Предлагаю услуги» появится на этапе 3. Пока можно оставить заявку.</p>
+
+        <form id="order-form" class="card mt-6 grid max-w-2xl gap-4 p-6">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Категория
+              <select name="category" class="input font-normal">
+                <option value="homework">Помощь с ДЗ / лабой</option>
+                <option value="notes">Конспект</option>
+                <option value="presentation">Презентация</option>
+                <option value="tutoring">Репетиторство</option>
+                <option value="other">Другое</option>
+              </select>
+            </label>
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Предмет
+              <input name="subject" class="input font-normal" required>
+            </label>
+          </div>
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Что нужно сделать
+            <textarea name="task" rows="3" class="input font-normal" required></textarea>
+          </label>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Дедлайн
+              <input name="deadline" type="datetime-local" class="input font-normal">
+            </label>
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Бюджет, ₸
+              <input name="price" type="number" min="0" step="500" value="3000" class="input font-normal">
+            </label>
+          </div>
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Комментарий
+            <input name="comment" class="input font-normal" placeholder="Формат сдачи, требования препода…">
+          </label>
+          <div id="order-summary" class="rounded-xl bg-slate-50 p-4 text-sm ring-1 ring-slate-100"></div>
+          <button type="submit" class="btn-primary"><span data-emoji="plane" data-size="18"></span>Отправить заявку в Telegram</button>
+        </form>
+      </section>
+
+      <!-- ЗАГЛУШКИ -->
+      <section data-page="teachers" hidden>
+        <div class="card flex flex-col items-center px-6 py-16 text-center">
+          <span data-emoji="shush" data-size="96"></span>
+          <h1 class="mt-4 font-display text-2xl font-semibold text-slate-900">Препод-конфиденциально</h1>
+          <p class="mt-2 max-w-md text-slate-500">Анонимные советы: как преподаватель принимает работы, к чему придирается и что ценит. Скоро.</p>
+        </div>
+      </section>
+      <section data-page="utils" hidden>
+        <div class="card flex flex-col items-center px-6 py-16 text-center">
+          <span data-emoji="tools" data-size="96"></span>
+          <h1 class="mt-4 font-display text-2xl font-semibold text-slate-900">Утилиты</h1>
+          <p class="mt-2 max-w-md text-slate-500">Генератор титульного листа UIB в Word и PDF. Скоро.</p>
+        </div>
+      </section>
+      <section data-page="memes" hidden>
+        <div class="card flex flex-col items-center px-6 py-16 text-center">
+          <span data-emoji="skull" data-size="96"></span>
+          <h1 class="mt-4 font-display text-2xl font-semibold text-slate-900">Биржа мемов и фейлов</h1>
+          <p class="mt-2 max-w-md text-slate-500">Студенческий юмор и жизненные истории с реакциями «Жизненно» и «W в чат». Скоро.</p>
+        </div>
+      </section>
+
+      <footer class="mt-16 text-xs text-slate-400">
+        UIB Hub — неофициальный студенческий проект. Данные из .ics хранятся только в твоём браузере.
+      </footer>
+    </main>
+  </div>
+
+  <!-- Вставка дедлайнов из Academo -->
+  <dialog id="academo-dialog" class="w-[min(640px,calc(100vw-32px))] rounded-3xl p-0 shadow-2xl backdrop:bg-slate-900/40 backdrop:backdrop-blur-sm">
+    <div class="p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span data-emoji="clipboard" data-size="40"></span>
+          <div>
+            <h2 class="font-display text-lg font-semibold text-slate-900">Вставить из Academo</h2>
+            <p class="text-sm text-slate-500">Шкала времени → Ctrl+A → Ctrl+C → вставь сюда</p>
+          </div>
+        </div>
+        <button type="button" data-close class="btn-ghost" aria-label="Закрыть">✕</button>
+      </div>
+      <textarea id="academo-text" rows="7" class="input mt-4 w-full font-mono text-xs" placeholder="Четверг, 29 октября 2026 г.&#10;Тест 9&#10;Философия 26/27 5 semester&#10;09:50"></textarea>
+      <div id="academo-preview" class="mt-3 rounded-xl bg-slate-50 p-3 text-sm empty:hidden"></div>
+      <div class="mt-4 flex justify-end gap-2">
+        <button type="button" data-close class="btn-secondary">Отмена</button>
+        <button id="academo-save" type="button" class="btn-primary disabled:cursor-not-allowed disabled:opacity-50" disabled>Добавить в мои дедлайны</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Добавить работу в базу знаний -->
+  <dialog id="submit-dialog" class="w-[min(980px,calc(100vw-32px))] rounded-3xl p-0 shadow-2xl backdrop:bg-slate-900/40 backdrop:backdrop-blur-sm">
+    <div class="p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span data-emoji="inbox" data-size="40"></span>
+          <div>
+            <h2 class="font-display text-lg font-semibold text-slate-900">Добавить работу</h2>
+            <p class="text-sm text-slate-500">Расскажи, как сдал. После проверки модератором работа появится в базе.</p>
+          </div>
+        </div>
+        <button type="button" data-close class="btn-ghost" aria-label="Закрыть">✕</button>
+      </div>
+
+      <form id="submit-form" class="mt-5 grid gap-6 lg:grid-cols-[1fr_320px]" novalidate>
+        <div class="grid content-start gap-3">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Предмет *
+              <input name="subject" list="submit-subjects" class="input font-normal" placeholder="Например, ООП на Java">
+              <datalist id="submit-subjects"></datalist>
+            </label>
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Твоя ОП *
+              <select name="program" class="input font-normal"><option value="">Выбери программу</option></select>
+            </label>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Что сдавал *
+              <input name="work" class="input font-normal" placeholder="Лабораторная №3, эссе…">
+            </label>
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Преподаватель
+              <input name="teacher" list="submit-teachers" class="input font-normal" placeholder="Фамилия И.О.">
+              <datalist id="submit-teachers"></datalist>
+            </label>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Курс
+              <select name="year" class="input font-normal"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+            </label>
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Балл
+              <input name="got" type="number" min="0" class="input font-normal" placeholder="95">
+            </label>
+            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Из
+              <input name="max" type="number" min="1" value="100" class="input font-normal">
+            </label>
+          </div>
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Чем пользовался
+            <input name="stack" class="input font-normal" placeholder="Через запятую: Excel, Figma, Java">
+          </label>
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Совет тем, кто будет сдавать
+            <textarea name="tip" rows="3" class="input font-normal" placeholder="На что смотрит преподаватель, за что снимают баллы…"></textarea>
+          </label>
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Ссылка на материалы
+            <input name="link" type="url" class="input font-normal" placeholder="https://drive.google.com/…">
+          </label>
+          <div class="flex flex-wrap items-center gap-3">
+            <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
+              <input name="anonymous" type="checkbox" checked class="h-4 w-4 accent-brand-600"> Анонимно
+            </label>
+            <input name="nick" class="input flex-1 font-normal disabled:bg-slate-50" placeholder="или твой ник" disabled>
+          </div>
+          <!-- Ловушка для ботов: человек это поле не видит и не заполняет -->
+          <input name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" class="absolute -left-[9999px] h-px w-px opacity-0">
+          <p id="submit-error" class="text-sm font-semibold text-red-600" aria-live="polite"></p>
+          <div class="flex justify-end gap-2">
+            <button type="button" data-close class="btn-secondary">Отмена</button>
+            <button type="submit" class="btn-primary">Отправить на проверку</button>
+          </div>
+        </div>
+        <div>
+          <p class="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Так будет выглядеть</p>
+          <div id="submit-preview" class="pointer-events-none"></div>
+        </div>
+      </form>
+
+      <div id="submit-done" class="hidden py-10 text-center">
+        <span data-emoji="party" data-size="80"></span>
+        <p id="submit-done-text" class="mx-auto mt-4 max-w-md font-semibold text-slate-700"></p>
+        <div class="mt-6 flex flex-wrap justify-center gap-2">
+          <a id="submit-telegram" class="btn-primary" target="_blank" rel="noopener"><span data-emoji="plane" data-size="18"></span>Открыть Telegram</a>
+          <button id="submit-copy" type="button" class="btn-secondary">Скопировать текст</button>
+          <button type="button" data-close class="btn-ghost">Закрыть</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
