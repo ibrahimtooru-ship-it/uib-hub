@@ -4,6 +4,9 @@ worker/.wrangler/
 worker/.dev.vars
 .env
 
+# Локальные настройки редактора и Claude Code
+.claude/
+
 # Системные файлы
 .DS_Store
 Thumbs.db

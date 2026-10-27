@@ -7,12 +7,19 @@ import { getCatalog, materialCard, materialsReady } from './materials.js';
 
 const el = {};
 
-// Коды ошибок, которые возвращает worker/src/index.js
+// Те же ограничения проверяет worker/src/index.js
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const FILE_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip', 'png', 'jpg', 'jpeg'];
+const FILE_HINT = 'PDF, Word, PPT, Excel, фото, ZIP · до 10 МБ';
+
+// Коды ошибок, которые возвращает Worker
 const SERVER_ERRORS = {
   rate_limited: 'Слишком много заявок подряд. Попробуй через час.',
   subject_and_work_required: 'Укажи предмет и название работы.',
   program_required: 'Выбери свою ОП.',
   forbidden: 'Отправка с этого адреса не разрешена.',
+  file_type: `Такой тип файла не подходит. Можно: ${FILE_HINT}.`,
+  file_too_big: 'Файл больше 10 МБ. Сожми его или загрузи в ZIP.',
 };
 
 export function initSubmit() {
@@ -24,6 +31,11 @@ export function initSubmit() {
   el.doneText = document.getElementById('submit-done-text');
   el.tgLink = document.getElementById('submit-telegram');
   el.copy = document.getElementById('submit-copy');
+  el.drop = document.getElementById('submit-file-drop');
+  el.fileName = document.getElementById('submit-file-name');
+  el.fileHint = document.getElementById('submit-file-hint');
+  el.fileClear = document.getElementById('submit-file-clear');
+  initFilePicker();
 
   document.addEventListener('click', (event) => {
     if (event.target.closest('[data-open-submit]')) open();
@@ -36,6 +48,51 @@ export function initSubmit() {
   el.form.elements.anonymous.addEventListener('change', () => {
     el.form.elements.nick.disabled = el.form.elements.anonymous.checked;
   });
+}
+
+function initFilePicker() {
+  const input = el.form.elements.file;
+  input.addEventListener('change', () => setFile(input.files[0] ?? null));
+  el.fileClear.addEventListener('click', () => setFile(null));
+
+  // Перетаскивание файла на поле (на компьютере)
+  el.drop.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    el.drop.classList.add('border-brand-400', 'bg-brand-50');
+  });
+  el.drop.addEventListener('dragleave', () => el.drop.classList.remove('border-brand-400', 'bg-brand-50'));
+  el.drop.addEventListener('drop', (event) => {
+    event.preventDefault();
+    el.drop.classList.remove('border-brand-400', 'bg-brand-50');
+    const file = event.dataTransfer.files[0];
+    if (!file) return;
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    setFile(file);
+  });
+}
+
+function fileProblem(file) {
+  const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+  if (!FILE_EXTENSIONS.includes(ext)) return SERVER_ERRORS.file_type;
+  if (file.size > MAX_FILE_BYTES) return SERVER_ERRORS.file_too_big;
+  return '';
+}
+
+function setFile(file) {
+  const input = el.form.elements.file;
+  const problem = file ? fileProblem(file) : '';
+  if (!file || problem) input.value = '';
+  el.error.textContent = problem;
+
+  const chosen = file && !problem;
+  el.fileName.textContent = chosen ? file.name : 'Выбрать файл';
+  el.fileHint.textContent = chosen ? `${(file.size / 1024 / 1024).toFixed(1)} МБ · нажми, чтобы заменить` : FILE_HINT;
+  el.fileClear.classList.toggle('hidden', !chosen);
+  el.drop.classList.toggle('border-solid', chosen);
+  el.drop.classList.toggle('border-brand-200', chosen);
+  renderPreview();
 }
 
 async function open() {
@@ -94,10 +151,13 @@ function validate(m) {
 
 function renderPreview() {
   const m = readMaterial();
+  const file = el.form.elements.file.files[0];
   el.preview.innerHTML = materialCard({
     ...m,
     subject: m.subject || 'Предмет',
     work: m.work || 'Название работы',
+    // Настоящую ссылку на файл Worker поставит при публикации
+    links: file ? [{ label: file.name, url: '#', file: true }, ...m.links] : m.links,
   });
 }
 
@@ -110,15 +170,23 @@ async function onSubmit(event) {
 
   if (CONFIG.SUBMIT_ENDPOINT) {
     const button = el.form.querySelector('[type="submit"]');
+    const label = button.textContent;
+    const file = el.form.elements.file.files[0];
     button.disabled = true;
+    button.textContent = file ? 'Загружаю файл…' : 'Отправляю…';
+
+    // multipart: Content-Type с границей частей браузер проставит сам
+    const body = new FormData();
+    body.set('payload', JSON.stringify({ type: 'material', data: material, website: el.form.elements.website.value }));
+    if (file) body.set('file', file, file.name);
     try {
-      const res = await fetch(CONFIG.SUBMIT_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'material', data: material, website: el.form.elements.website.value }),
-      });
+      const res = await fetch(CONFIG.SUBMIT_ENDPOINT, { method: 'POST', body });
       if (res.ok) {
+        el.form.reset();
+        setFile(null);
         showDone('Готово! Работа ушла на модерацию и появится в базе после проверки.', null);
+      } else if (res.status === 413) {
+        el.error.textContent = SERVER_ERRORS.file_too_big;
       } else {
         const { error } = await res.json().catch(() => ({}));
         el.error.textContent = SERVER_ERRORS[error] ?? 'Не получилось отправить. Попробуй ещё раз чуть позже.';
@@ -128,6 +196,7 @@ async function onSubmit(event) {
       el.error.textContent = 'Нет связи с сервером. Проверь интернет и попробуй ещё раз.';
     } finally {
       button.disabled = false;
+      button.textContent = label;
     }
     return;
   }
@@ -148,6 +217,7 @@ function moderatorMessage(m) {
     m.stack.length && `Стек: ${m.stack.join(', ')}`,
     m.tip && `Совет: ${m.tip}`,
     m.links[0] && `Ссылка: ${m.links[0].url}`,
+    el.form.elements.file.files[0] && `Файл: ${el.form.elements.file.files[0].name} — прикреплю следующим сообщением`,
     `Автор: ${m.author.display}`,
     '',
     'JSON для materials.json:',

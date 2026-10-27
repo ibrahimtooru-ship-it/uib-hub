@@ -90,7 +90,11 @@ check('materials.json: обязательные поля, ОП, баллы, сс
       for (const code of m.programs ?? []) if (!programCodes.has(code)) problems.push(`${where}: неизвестная ОП «${code}»`);
       if (m.score && !(m.score.got >= 0 && m.score.got <= m.score.max)) problems.push(`${where}: балл ${m.score.got}/${m.score.max}`);
       if (m.course_year != null && ![1, 2, 3, 4].includes(m.course_year)) problems.push(`${where}: курс ${m.course_year}`);
-      for (const link of m.links ?? []) if (!/^https?:\/\//.test(link.url)) problems.push(`${where}: ссылка ${link.url}`);
+      for (const link of m.links ?? []) {
+        // Загруженный файл лежит в репозитории и связан с работой по id
+        const ok = link.file ? link.url.startsWith(`files/${m.id}/`) : /^https?:\/\//.test(link.url);
+        if (!ok) problems.push(`${where}: ссылка ${link.url}`);
+      }
       if (!isDate(m.created_at)) problems.push(`${where}: дата created_at`);
       return problems;
     }),
@@ -173,62 +177,159 @@ await checkAsync('Worker: приём, защита, модерация, публ
     TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_WEBHOOK_SECRET: 'S', GITHUB_TOKEN: 'G',
   };
   const telegram = [];
-  let file = { sha: 'a', text: JSON.stringify({ materials: [] }) };
-  let lastPut = null;
+  const github = fakeGitHub({ 'data/materials.json': Buffer.from(JSON.stringify({ materials: [] })) });
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, opts = {}) => {
     url = String(url);
     if (url.startsWith('https://api.telegram.org/')) {
-      telegram.push({ method: url.split('/').pop(), body: JSON.parse(opts.body) });
-      return new Response(JSON.stringify({ ok: true, result: {} }));
+      const isForm = opts.body instanceof FormData;
+      telegram.push({ method: url.split('/').pop(), body: isForm ? Object.fromEntries(opts.body) : JSON.parse(opts.body) });
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 77 } }));
     }
-    if (url.startsWith('https://api.github.com/')) {
-      if (opts.method === 'GET') return new Response(JSON.stringify({ sha: file.sha, content: Buffer.from(file.text).toString('base64') }));
-      lastPut = JSON.parse(opts.body);
-      file = { sha: 'b', text: Buffer.from(lastPut.content, 'base64').toString('utf8') };
-      return new Response('{}');
-    }
+    if (url.startsWith('https://api.github.com/repos/me/repo/')) return github.handle(url, opts);
     throw new Error(`Неожиданный запрос в сеть: ${url}`);
   };
 
   const request = (path, body, headers = {}) => ({ url: `https://w.test${path}`, method: 'POST', headers: new Headers(headers), json: async () => body });
+  const upload = (payload, file, headers = site) => {
+    const form = new FormData();
+    form.set('payload', JSON.stringify(payload));
+    if (file) form.set('file', file);
+    return { url: 'https://w.test/submit', method: 'POST', headers: new Headers({ ...headers, 'Content-Type': 'multipart/form-data; boundary=x' }), formData: async () => form };
+  };
   const site = { Origin: 'https://site.test', 'CF-Connecting-IP': '1.1.1.1' };
   const work = { type: 'material', data: { subject: 'Тест', work: 'Лаба', programs: ['ai', 'BAD'], teacher: 'Иванов И.И.', links: [{ url: 'javascript:alert(1)' }], author: { anonymous: true } } };
+  const pdfBytes = Buffer.from('%PDF-1.4 тестовый файл');
   const problems = [];
   const expect = (ok, message) => { if (!ok) problems.push(message); };
+  const press = (data, chat = -1, secret = 'S') => worker.fetch(request('/telegram',
+    { callback_query: { id: 'q', data, from: { username: 'mod' }, message: { message_id: 1, chat: { id: chat }, text: 'Карточка' } } },
+    { 'X-Telegram-Bot-Api-Secret-Token': secret }), env);
+  const materials = () => JSON.parse(github.read('data/materials.json')).materials;
 
   try {
-    let res = await worker.fetch(request('/submit', work, site), env);
-    const { id } = await res.json();
-    expect(res.status === 200 && id, `приём работы: статус ${res.status}`);
-    const saved = JSON.parse(kv.get(`pending:${id}`) ?? '{}');
+    // Заявка без файла (старый JSON-формат тоже принимается)
+    let res = await worker.fetch(request('/submit', work, { ...site, 'Content-Type': 'application/json' }), env);
+    const { id: plainId } = await res.json();
+    expect(res.status === 200 && plainId, `приём работы: статус ${res.status}`);
+    const saved = JSON.parse(kv.get(`pending:${plainId}`) ?? '{}').material ?? {};
     expect(saved.programs?.join() === 'ai' && saved.links?.length === 0 && saved.teacher === 'Иванов И.И.', 'Worker не очистил данные заявки');
     expect(telegram[0]?.method === 'sendMessage', 'карточка не ушла модераторам');
 
-    res = await worker.fetch(request('/submit', work, { ...site, Origin: 'https://evil.test' }), env);
-    expect(res.status === 403, `чужой сайт: статус ${res.status}`);
-    res = await worker.fetch(request('/submit', { ...work, website: 'spam' }, site), env);
-    expect(res.status === 200 && kv.size === 2, 'ловушка для ботов пропустила заявку');
+    // Заявка с файлом
+    telegram.length = 0;
+    res = await worker.fetch(upload(work, new File([pdfBytes], 'Отчёт по ООП.pdf')), env);
+    const { id } = await res.json();
+    expect(res.status === 200 && kv.get(`file:${id}`), `приём файла: статус ${res.status}`);
+    const doc = telegram.find((t) => t.method === 'sendDocument');
+    expect(doc && doc.body.reply_to_message_id === '77', 'файл не ушёл модераторам под карточкой');
 
-    const press = (data, chat = -1, secret = 'S') => worker.fetch(request('/telegram',
-      { callback_query: { id: 'q', data, from: { username: 'mod' }, message: { message_id: 1, chat: { id: chat }, text: 'Карточка' } } },
-      { 'X-Telegram-Bot-Api-Secret-Token': secret }), env);
+    res = await worker.fetch(upload(work, new File(['MZ'], 'virus.exe')), env);
+    expect(res.status === 400 && (await res.json()).error === 'file_type', 'принят файл .exe');
+    res = await worker.fetch(upload(work, new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'big.pdf')), env);
+    expect(res.status === 400 && (await res.json()).error === 'file_too_big', 'принят файл больше 10 МБ');
+
+    // Защита
+    res = await worker.fetch(upload(work, null, { ...site, Origin: 'https://evil.test' }), env);
+    expect(res.status === 403, `чужой сайт: статус ${res.status}`);
+    const pendingBefore = [...kv.keys()].filter((k) => k.startsWith('pending:')).length;
+    res = await worker.fetch(upload({ ...work, website: 'spam' }, null), env);
+    expect(res.status === 200 && [...kv.keys()].filter((k) => k.startsWith('pending:')).length === pendingBefore, 'ловушка для ботов пропустила заявку');
     res = await press(`a:${id}`, -1, 'wrong');
     expect(res.status === 403, 'вебхук без секрета не отклонён');
     await press(`a:${id}`, 999);
     expect(kv.has(`pending:${id}`), 'кнопка сработала в чужом чате');
 
+    // Публикация с файлом: один коммит, файл и работа вместе; первый PATCH ловит конфликт
+    github.conflictOnce();
     await press(`a:${id}`);
-    const published = JSON.parse(file.text).materials;
-    expect(published.length === 1 && published[0].id === id, 'работа не опубликована');
-    expect(lastPut?.author?.email === env.COMMIT_EMAIL && lastPut?.committer?.email === env.COMMIT_EMAIL, 'в коммите не скрытая почта');
+    const published = materials().find((m) => m.id === id);
+    const fileLink = published?.links.find((l) => l.file);
+    expect(published, 'работа с файлом не опубликована');
+    expect(fileLink?.label === 'Отчёт по ООП.pdf' && fileLink.url === `files/${id}/otchyot-po-oop.pdf`, `ссылка на файл: ${fileLink?.url}`);
+    expect(github.read(fileLink?.url ?? '')?.equals(pdfBytes), 'файл в репозитории не совпадает с загруженным');
+    expect(github.commits.length === 1 && github.commits[0].files === 2, `ожидался 1 коммит с 2 файлами, было ${github.commits.map((c) => c.files)}`);
+    expect(github.commits.every((c) => c.author.email === env.COMMIT_EMAIL && c.committer.email === env.COMMIT_EMAIL), 'в коммите не скрытая почта');
+    expect(!kv.has(`file:${id}`) && !kv.has(`pending:${id}`), 'после публикации в очереди остался мусор');
     await press(`a:${id}`);
-    expect(JSON.parse(file.text).materials.length === 1, 'повторное нажатие опубликовало дважды');
+    expect(materials().filter((m) => m.id === id).length === 1, 'повторное нажатие опубликовало дважды');
+
+    // Публикация без файла и отклонение
+    await press(`a:${plainId}`);
+    expect(materials().some((m) => m.id === plainId) && github.commits.at(-1).files === 1, 'работа без файла не опубликована');
+    res = await worker.fetch(upload(work, new File([pdfBytes], 'lab.pdf')), env);
+    const { id: rejectId } = await res.json();
+    await press(`r:${rejectId}`);
+    expect(!kv.has(`pending:${rejectId}`) && !kv.has(`file:${rejectId}`), 'после отклонения остались заявка или файл');
   } finally {
     globalThis.fetch = realFetch;
   }
   return problems;
 });
+
+// Минимальный GitHub Git Data API в памяти: ref → commit → дерево файлов
+function fakeGitHub(initialFiles) {
+  const blobs = new Map();
+  const trees = new Map([['t0', new Map(Object.entries(initialFiles))]]);
+  const commitTrees = new Map([['c0', 't0']]);
+  const meta = new Map(); // sha коммита → автор и коммиттер
+  const commits = [];     // коммиты, которые реально попали в ветку
+  let head = 'c0';
+  let counter = 0;
+  let conflict = false;
+  const reply = (data, status = 200) => new Response(JSON.stringify(data), { status });
+
+  return {
+    commits,
+    conflictOnce: () => { conflict = true; },
+    read: (path) => trees.get(commitTrees.get(head)).get(path),
+    handle(url, opts) {
+      const path = url.replace('https://api.github.com/repos/me/repo/', '');
+      const body = opts.body ? JSON.parse(opts.body) : null;
+      if (path === 'git/ref/heads/main') return reply({ object: { sha: head } });
+      if (path.startsWith('git/commits/')) return reply({ tree: { sha: commitTrees.get(path.split('/').pop()) } });
+      if (path.startsWith('contents/')) {
+        const [file, query] = path.slice('contents/'.length).split('?ref=');
+        return reply({ content: trees.get(commitTrees.get(query)).get(file).toString('base64') });
+      }
+      if (path === 'git/blobs') {
+        const sha = `b${++counter}`;
+        blobs.set(sha, Buffer.from(body.content, 'base64'));
+        return reply({ sha });
+      }
+      if (path === 'git/trees') {
+        const sha = `t${++counter}`;
+        const files = new Map(trees.get(body.base_tree));
+        for (const entry of body.tree) files.set(entry.path, blobs.get(entry.sha));
+        trees.set(sha, files);
+        return reply({ sha, size: body.tree.length });
+      }
+      if (path === 'git/commits') {
+        const sha = `c${++counter}`;
+        commitTrees.set(sha, body.tree);
+        meta.set(sha, { author: body.author, committer: body.committer });
+        return reply({ sha });
+      }
+      if (path === 'git/refs/heads/main') {
+        if (conflict) {
+          // Кто-то успел закоммитить раньше: ветка ушла вперёд
+          conflict = false;
+          const sha = `c${++counter}`;
+          commitTrees.set(sha, commitTrees.get(head));
+          head = sha;
+          return reply({ message: 'Update is not a fast forward' }, 422);
+        }
+        const parentFiles = trees.get(commitTrees.get(head));
+        const newFiles = trees.get(commitTrees.get(body.sha));
+        const changed = [...newFiles].filter(([p, v]) => !parentFiles.get(p)?.equals(v)).length;
+        commits.push({ ...meta.get(body.sha), files: changed });
+        head = body.sha;
+        return reply({ object: { sha: head } });
+      }
+      return reply({ message: `не поддержано: ${opts.method} ${path}` }, 500);
+    },
+  };
+}
 
 console.log(failures.length
   ? `\n✗ Не прошло: ${failures.length} из ${passed + failures.length}`

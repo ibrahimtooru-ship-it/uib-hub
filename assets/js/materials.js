@@ -272,6 +272,19 @@ function scoreRing(m) {
     </div>`;
 }
 
+// Файл, загруженный через форму, лежит в репозитории (files/…) — его скачиваем, ссылки открываем
+function linkButton(link) {
+  const href = escapeHtml(safeUrl(link.url));
+  const label = escapeHtml(link.label);
+  if (link.file) {
+    // download с именем: файл сохранится как «Отчёт по ООП.pdf», а не как имя из пути
+    return `<a href="${href}" download="${label}" title="${label}" class="inline-flex max-w-[14rem] items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 transition hover:bg-emerald-100">
+      <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
+      <span class="truncate">${label}</span></a>`;
+  }
+  return `<a href="${href}" target="_blank" rel="noopener" title="${label}" class="inline-flex max-w-[14rem] items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-brand-700 transition hover:bg-brand-100">${emoji('paperclip', 14)}<span class="truncate">${label}</span></a>`;
+}
+
 export function materialCard(m) {
   const programChips = (m.programs ?? []).map((code) =>
     `<span class="rounded-md bg-brand-50 px-1.5 py-0.5 text-[11px] font-bold text-brand-700">${escapeHtml(state.programs.get(code)?.short ?? code)}</span>`);
@@ -307,8 +320,8 @@ export function materialCard(m) {
       <footer class="mt-auto pt-4">
         <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs font-semibold text-slate-500">
           <span class="flex items-center gap-1.5">${author}${Number.isNaN(created.getTime()) ? '' : `<span class="text-slate-300">·</span><span class="font-medium">${formatRelative(created)}</span>`}</span>
-          <span class="flex flex-wrap gap-1.5">
-            ${(m.links ?? []).map((l) => `<a href="${escapeHtml(safeUrl(l.url))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-brand-700 transition hover:bg-brand-100">${emoji('paperclip', 14)}${escapeHtml(l.label)}</a>`).join('')}
+          <span class="flex min-w-0 flex-wrap gap-1.5">
+            ${(m.links ?? []).map(linkButton).join('')}
           </span>
         </div>
       </footer>

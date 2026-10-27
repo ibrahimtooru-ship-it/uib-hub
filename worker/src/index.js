@@ -1,9 +1,9 @@
 // UIB Hub — приём работ в базу знаний (Cloudflare Worker).
 //
-//   POST /submit    ← форма «Добавить работу» на сайте: работа уходит в очередь (KV)
-//                     и модераторам в Telegram с кнопками ✅ / ❌
-//   POST /telegram  ← webhook бота: ✅ коммитит работу в materials.json через GitHub API,
-//                     ❌ удаляет её из очереди
+//   POST /submit    ← форма «Добавить работу» на сайте (multipart: payload + необязательный file):
+//                     работа и файл уходят в очередь (KV) и модераторам в Telegram с кнопками ✅ / ❌
+//   POST /telegram  ← webhook бота: ✅ одним коммитом кладёт файл в files/ и работу в materials.json,
+//                     ❌ удаляет заявку и файл из очереди
 //
 // Секреты (wrangler secret put): TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, GITHUB_TOKEN
 // Переменные (wrangler.toml):    ALLOWED_ORIGIN, MODERATOR_CHAT_ID, GITHUB_REPO, GITHUB_BRANCH, MATERIALS_PATH,
@@ -13,6 +13,9 @@
 const LIMITS = { subject: 120, work: 200, teacher: 80, tip: 1000, stackItems: 12, stackItem: 40, nick: 40, url: 500, programs: 3 };
 const RATE_LIMIT_PER_HOUR = 5;
 const PENDING_TTL = 60 * 60 * 24 * 30; // необработанная заявка живёт 30 дней
+// Те же ограничения стоят в форме на сайте (assets/js/submit.js)
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const FILE_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip', 'png', 'jpg', 'jpeg'];
 
 export default {
   async fetch(request, env) {
@@ -31,13 +34,24 @@ export default {
 
 // --- Приём заявки с сайта ---
 
+async function readSubmission(request) {
+  const type = request.headers.get('Content-Type') ?? '';
+  if (type.includes('multipart/form-data')) {
+    const form = await request.formData();
+    const file = form.get('file');
+    return { body: JSON.parse(form.get('payload') ?? 'null'), file: file && typeof file !== 'string' && file.size ? file : null };
+  }
+  return { body: await request.json(), file: null };
+}
+
 async function handleSubmit(request, env) {
   const origin = request.headers.get('Origin');
   if (env.ALLOWED_ORIGIN !== '*' && origin !== env.ALLOWED_ORIGIN) return json({ ok: false, error: 'forbidden' }, 403);
 
   let body;
+  let file;
   try {
-    body = await request.json();
+    ({ body, file } = await readSubmission(request));
   } catch {
     return json({ ok: false, error: 'bad_json' }, 400);
   }
@@ -45,16 +59,27 @@ async function handleSubmit(request, env) {
   // Скрытое поле: люди его не видят, а боты заполняют. Делаем вид, что всё прошло
   if (body.website) return json({ ok: true });
 
+  let attachment = null;
+  if (file) {
+    attachment = describeFile(file);
+    if (attachment.error) return json({ ok: false, error: attachment.error }, 400);
+  }
+
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
   if (!(await takeRateLimit(env, ip))) return json({ ok: false, error: 'rate_limited' }, 429);
 
   const { material, error } = cleanMaterial(body.data);
   if (error) return json({ ok: false, error }, 400);
 
-  await env.SUBMISSIONS.put(`pending:${material.id}`, JSON.stringify(material), { expirationTtl: PENDING_TTL });
-  await telegram(env, 'sendMessage', {
+  const pending = { material, attachment };
+  if (attachment) {
+    await env.SUBMISSIONS.put(`file:${material.id}`, await file.arrayBuffer(), { expirationTtl: PENDING_TTL });
+  }
+  await env.SUBMISSIONS.put(`pending:${material.id}`, JSON.stringify(pending), { expirationTtl: PENDING_TTL });
+
+  const card = await telegram(env, 'sendMessage', {
     chat_id: env.MODERATOR_CHAT_ID,
-    text: formatForModerators(material),
+    text: formatForModerators(material, attachment),
     parse_mode: 'HTML',
     disable_web_page_preview: true,
     reply_markup: {
@@ -64,7 +89,36 @@ async function handleSubmit(request, env) {
       ]],
     },
   });
+  // Файл отдельным сообщением под карточкой, чтобы модератор мог открыть его до решения
+  if (attachment) {
+    const form = new FormData();
+    form.set('chat_id', env.MODERATOR_CHAT_ID);
+    form.set('reply_to_message_id', String(card.message_id));
+    form.set('document', file, attachment.name);
+    await telegram(env, 'sendDocument', form);
+  }
   return json({ ok: true, id: material.id });
+}
+
+function describeFile(file) {
+  const name = String(file.name || 'file').slice(-120);
+  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  if (!FILE_EXTENSIONS.includes(ext)) return { error: 'file_type' };
+  if (file.size > MAX_FILE_BYTES) return { error: 'file_too_big' };
+  // Латиница для пути в репозитории; оригинальное имя остаётся подписью ссылки
+  const slug = transliterate(name.slice(0, -(ext.length + 1)).toLowerCase())
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'file';
+  return { name, size: file.size, ext, slug };
+}
+
+const TRANSLIT = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm',
+  н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '',
+  ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya', ә: 'a', ғ: 'g', қ: 'q', ң: 'n', ө: 'o', ұ: 'u', ү: 'u', һ: 'h', і: 'i',
+};
+
+function transliterate(text) {
+  return [...text].map((ch) => TRANSLIT[ch] ?? ch).join('');
 }
 
 // KV не атомарный, так что лимит примерный — от массового спама его хватает
@@ -125,7 +179,7 @@ function cleanMaterial(data) {
   };
 }
 
-function formatForModerators(m) {
+function formatForModerators(m, attachment) {
   const line = (label, value) => (value ? `<b>${label}:</b> ${escapeHtml(value)}` : null);
   return [
     '📚 <b>Новая работа для UIB Hub</b>',
@@ -139,6 +193,7 @@ function formatForModerators(m) {
     line('Стек', m.stack.join(', ')),
     line('Совет', m.tip),
     line('Ссылка', m.links[0]?.url),
+    line('Файл', attachment && `${attachment.name} (${(attachment.size / 1024 / 1024).toFixed(1)} МБ) — ниже`),
     line('Автор', m.author.display),
   ].filter((l) => l !== null).join('\n');
 }
@@ -173,16 +228,23 @@ async function handleTelegram(request, env) {
     // Сначала снимаем заявку с очереди, чтобы двойной клик не опубликовал её дважды
     await env.SUBMISSIONS.delete(key);
     try {
-      await publishMaterial(env, JSON.parse(raw));
+      const saved = JSON.parse(raw);
+      // Заявки до появления файлов хранились как сама работа, без обёртки
+      const pending = saved.material ? saved : { material: saved, attachment: null };
+      const fileBytes = pending.attachment ? await env.SUBMISSIONS.get(`file:${id}`, 'arrayBuffer') : null;
+      if (pending.attachment && !fileBytes) throw new Error('файл заявки не найден');
+      await publish(env, pending, fileBytes);
     } catch (err) {
       console.error(err);
       await env.SUBMISSIONS.put(key, raw, { expirationTtl: PENDING_TTL });
       await answer(env, callback, `Не удалось опубликовать: ${String(err.message).slice(0, 150)}`);
       return new Response('ok');
     }
+    await env.SUBMISSIONS.delete(`file:${id}`);
     await closeCard(env, callback, `✅ Опубликовано — ${who}`);
   } else if (action === 'r') {
     await env.SUBMISSIONS.delete(key);
+    await env.SUBMISSIONS.delete(`file:${id}`);
     await closeCard(env, callback, `❌ Отклонено — ${who}`);
   }
   return new Response('ok');
@@ -203,10 +265,11 @@ function answer(env, callback, text) {
 }
 
 async function telegram(env, method, payload) {
+  const isForm = payload instanceof FormData;
   const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    headers: isForm ? undefined : { 'Content-Type': 'application/json' },
+    body: isForm ? payload : JSON.stringify(payload),
   });
   const data = await res.json();
   if (!data.ok) throw new Error(`Telegram ${method}: ${data.description}`);
@@ -214,31 +277,53 @@ async function telegram(env, method, payload) {
 }
 
 // --- Публикация в GitHub ---
+// Git Data API: файл и materials.json попадают в один коммит, значит одна сборка Pages на работу
 
-async function publishMaterial(env, material) {
-  const path = `repos/${env.GITHUB_REPO}/contents/${env.MATERIALS_PATH}`;
-  // Если между чтением и записью файл успел измениться, GitHub вернёт 409 — перечитываем и пробуем снова
+async function publish(env, { material, attachment }, fileBytes) {
+  const repo = `repos/${env.GITHUB_REPO}`;
+  const branch = encodeURIComponent(env.GITHUB_BRANCH);
+  const identity = { name: env.COMMIT_NAME, email: env.COMMIT_EMAIL };
+
+  const entry = structuredClone(material);
+  const files = [];
+  if (attachment) {
+    const path = `files/${material.id}/${attachment.slug}.${attachment.ext}`;
+    files.push({ path, content: arrayBufferToBase64(fileBytes) });
+    entry.links.unshift({ label: attachment.name, url: path, file: true });
+  }
+
+  // Если ветка ушла вперёд между чтением и записью, GitHub вернёт 422 — перечитываем и пробуем снова
   for (let attempt = 0; attempt < 3; attempt++) {
-    const file = await github(env, 'GET', `${path}?ref=${encodeURIComponent(env.GITHUB_BRANCH)}`);
-    const data = JSON.parse(fromBase64(file.content));
+    const head = await github(env, 'GET', `${repo}/git/ref/heads/${branch}`);
+    const parent = await github(env, 'GET', `${repo}/git/commits/${head.object.sha}`);
+    const current = await github(env, 'GET', `${repo}/contents/${env.MATERIALS_PATH}?ref=${head.object.sha}`);
+    const data = JSON.parse(fromBase64(current.content));
     data.materials ??= [];
-    if (!data.materials.some((m) => m.id === material.id)) data.materials.push(material);
+    if (!data.materials.some((m) => m.id === entry.id)) data.materials.push(entry);
 
-    // Без явного автора GitHub подставил бы основную почту владельца токена
-    const identity = { name: env.COMMIT_NAME, email: env.COMMIT_EMAIL };
-    const res = await githubRaw(env, 'PUT', path, {
+    const blobs = [
+      ...files,
+      { path: env.MATERIALS_PATH, content: toBase64(`${JSON.stringify(data, null, 2)}\n`) },
+    ];
+    const tree = [];
+    for (const blob of blobs) {
+      const created = await github(env, 'POST', `${repo}/git/blobs`, { content: blob.content, encoding: 'base64' });
+      tree.push({ path: blob.path, mode: '100644', type: 'blob', sha: created.sha });
+    }
+    const newTree = await github(env, 'POST', `${repo}/git/trees`, { base_tree: parent.tree.sha, tree });
+    const commit = await github(env, 'POST', `${repo}/git/commits`, {
       message: `Новая работа: ${material.subject} — ${material.work}`,
-      content: toBase64(`${JSON.stringify(data, null, 2)}\n`),
-      sha: file.sha,
-      branch: env.GITHUB_BRANCH,
+      tree: newTree.sha,
+      parents: [head.object.sha],
       author: identity,
       committer: identity,
     });
-    if (res.status === 409) continue;
+    const res = await githubRaw(env, 'PATCH', `${repo}/git/refs/heads/${branch}`, { sha: commit.sha });
+    if (res.status === 422) continue;
     if (!res.ok) throw new Error(`GitHub ${res.status}`);
     return;
   }
-  throw new Error('GitHub: файл постоянно меняется, попробуй ещё раз');
+  throw new Error('GitHub: ветка постоянно меняется, попробуй ещё раз');
 }
 
 async function github(env, method, path, body) {
@@ -263,10 +348,16 @@ function githubRaw(env, method, path, body) {
 
 // --- Утилиты ---
 
-function toBase64(text) {
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
   let binary = '';
-  for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte);
+  // Кусками: String.fromCharCode(...огромный массив) переполняет стек
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(binary);
+}
+
+function toBase64(text) {
+  return arrayBufferToBase64(new TextEncoder().encode(text));
 }
 
 function fromBase64(base64) {
