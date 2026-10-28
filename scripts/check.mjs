@@ -109,6 +109,28 @@ check('deadlines.json: id и даты', () => {
   ];
 });
 
+check('courses.json: только факты, преподаватели без фамилий и контактов', () => {
+  const courses = json('data/courses.json').courses;
+  return [
+    ...duplicates(courses.map((c) => c.id)).map((id) => `курс повторяется: ${id}`),
+    ...courses.flatMap((c) => {
+      const problems = [];
+      if (!c.id || !c.name) problems.push(`${c.id ?? '(без id)'}: нет id или названия`);
+      if (c.course_year != null && ![1, 2, 3, 4].includes(c.course_year)) problems.push(`${c.id}: курс ${c.course_year}`);
+      if (c.credits != null && !(Number.isInteger(c.credits) && c.credits > 0 && c.credits <= 30)) problems.push(`${c.id}: кредиты ${c.credits}`);
+      for (const code of c.programs ?? []) if (!programCodes.has(code)) problems.push(`${c.id}: неизвестная ОП «${code}»`);
+      for (const role of ['lecturer', 'seminar']) {
+        const name = c[role];
+        if (!name) continue;
+        // Имя и отчество — два слова; третье почти всегда фамилия
+        if (name.trim().split(/\s+/).length > 2) problems.push(`${c.id}: «${name}» — похоже на фамилию, оставь имя и отчество`);
+        if (/@|https?:|\d{3}/.test(name)) problems.push(`${c.id}: в имени преподавателя контакт или ссылка`);
+      }
+      return problems;
+    }),
+  ];
+});
+
 check('guide.json: разделы, эмодзи, таблицы', () => {
   const guide = json('data/guide.json');
   return [
@@ -141,6 +163,7 @@ check('index.html: все id, которые ищет JS, существуют',
     ['assets/js/materials.js', 'kb-', /for \(const id of \[([^\]]+)\]\)/],
     ['assets/js/guide.js', 'guide-', /for \(const id of \[([^\]]+)\]\)/],
     ['assets/js/auth.js', 'auth-', /for \(const id of \[([^\]]+)\]\)/],
+    ['assets/js/courses.js', 'courses-', /for \(const id of \[([^\]]+)\]\)/],
   ]) {
     const names = read(file).match(list)?.[1].match(/'([^']+)'/g) ?? [];
     for (const name of names) wanted.push([file, prefix + name.slice(1, -1)]);
@@ -405,6 +428,17 @@ await checkAsync('Worker: аккаунты, сброс пароля, авата�
     await call('POST', '/auth/register', { body: { barcode: '2222222', password: 'legacy-pass', nickname: 'Старожил' } });
     res = await call('GET', '/auth/me', { token: 'legacy-token-0123456789abcdef' });
     expect(res.status === 200, 'сессия старого формата перестала работать');
+
+    // --- Предложение курса: только модераторам ---
+    res = await call('POST', '/courses/suggest', { body: { name: 'Цифровая схемотехника' } });
+    expect(res.status === 401, 'курс предложен без входа');
+    res = await call('POST', '/courses/suggest', { body: { name: '   ' }, token });
+    expect(res.status === 400 && (await res.json()).error === 'course_name_required', 'принят курс без названия');
+    telegram.length = 0;
+    res = await call('POST', '/courses/suggest', { body: { name: 'Цифровая   схемотехника', course_year: '3', credits: '5', lecturer: 'Назгуль Меиркановна' }, token });
+    const courseCard = telegram.find((t) => t.method === 'sendMessage')?.body.text ?? '';
+    expect(res.status === 200 && courseCard.includes('Цифровая схемотехника') && courseCard.includes('Назгуль Меиркановна') && courseCard.includes('1111111'), `карточка курса: ${courseCard}`);
+    expect(!github.files().some((f) => f.includes('courses')), 'предложение курса само попало в репозиторий');
 
     await call('POST', '/auth/logout', { token });
     res = await call('GET', '/auth/me', { token });

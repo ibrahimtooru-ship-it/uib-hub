@@ -3,6 +3,7 @@
 // • иначе — готовое сообщение модератору в Telegram (одна кнопка «Отправить»).
 import { api, currentUser, onAuthChange, requireLogin } from './auth.js';
 import { CONFIG } from './config.js';
+import { courseTeachers, coursesReady } from './courses.js';
 import { escapeHtml, safeUrl } from './utils.js';
 import { getCatalog, materialCard, materialsReady } from './materials.js';
 
@@ -105,7 +106,7 @@ function setFile(file) {
 
 async function open() {
   if (CONFIG.API_BASE && !(await requireLogin('Чтобы добавить работу, войди в аккаунт. Ник подставится сам.'))) return;
-  await materialsReady;
+  await Promise.all([materialsReady, coursesReady]);
   renderAuthor();
   fillOptions();
   showForm(true);
@@ -118,8 +119,9 @@ function fillOptions() {
   if (filled) return;
   filled = true;
   const { directions, programs, subjects, teachers } = getCatalog();
-  document.getElementById('submit-teachers').innerHTML =
-    teachers.map((t) => `<option value="${escapeHtml(t)}"></option>`).join('');
+  // Сначала имена из расписания, потом те, что уже встречаются в работах
+  document.getElementById('submit-teachers').innerHTML = [...new Set([...courseTeachers(), ...teachers])]
+    .map((t) => `<option value="${escapeHtml(t)}"></option>`).join('');
   el.form.elements.program.insertAdjacentHTML('beforeend', directions.map((d) => `
     <optgroup label="${escapeHtml(d.name)}">
       ${programs.filter((p) => p.direction === d.id).map((p) => `<option value="${escapeHtml(p.code)}">${escapeHtml(p.name)}</option>`).join('')}

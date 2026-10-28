@@ -1,4 +1,5 @@
 import { initAuth } from './auth.js';
+import { initCourses } from './courses.js';
 import { initDeadlines } from './deadlines.js';
 import { hydrateEmoji } from './emoji.js';
 import { initGuide } from './guide.js';
@@ -7,6 +8,7 @@ import { initMarketplace, prefillOrder } from './marketplace.js';
 import { initSubmit } from './submit.js';
 import { initUpdates } from './update.js';
 import { initViewer } from './viewer.js';
+import { initWelcome } from './welcome.js';
 
 const ROUTES = ['knowledge', 'guide', 'deadlines', 'teachers', 'marketplace', 'utils', 'memes'];
 const DEFAULT_ROUTE = 'knowledge';
@@ -61,10 +63,12 @@ hydrateEmoji();
 initAuth();
 initViewer();
 initUpdates();
+initWelcome();
 initMarketplace();
 initSubmit();
 window.addEventListener('hashchange', navigate);
 navigate();
 initMaterials();
+initCourses();
 initGuide();
 initDeadlines();

@@ -8,6 +8,7 @@
 //   POST /auth/reset-request ← «Забыл пароль»: заявка модераторам, они выдают одноразовый код лично
 //   POST /auth/reset     ← баркод + код от модератора + новый пароль
 //   POST /orders         ← заявка маркетплейса «Ищу исполнителя» (после входа) → в чат модераторов
+//   POST /courses/suggest ← новый курс или исправление (после входа) → модераторам, на сайт сам не попадает
 //   POST /submit        ← форма «Добавить работу» (только после входа; multipart: payload + необязательный file):
 //                          работа и файл уходят в очередь (KV) и модераторам в Telegram с кнопками ✅ / ❌
 //   GET  /files/:id      ← скачать файл работы (только после входа)
@@ -71,6 +72,7 @@ export default {
       if (route === 'POST /auth/reset-request') return withCors(env, await handleResetRequest(request, env));
       if (route === 'POST /auth/reset') return withCors(env, await handleReset(request, env));
       if (route === 'POST /orders') return withCors(env, await handleOrder(request, env));
+      if (route === 'POST /courses/suggest') return withCors(env, await handleCourseSuggest(request, env));
       if (route === 'POST /submit') return withCors(env, await handleSubmit(request, env));
       if (request.method === 'GET' && pathname.startsWith('/files/')) return withCors(env, await handleDownload(request, env, pathname.slice(7)));
       return withCors(env, json({ ok: false, error: 'not_found' }, 404));
@@ -388,6 +390,43 @@ async function handleOrder(request, env) {
       line('Написать', contact),
       line('Аккаунт', `${user.nickname} · баркод ${user.barcode}`),
     ].filter(Boolean).join('\n'),
+    parse_mode: 'HTML',
+  });
+  return json({ ok: true });
+}
+
+// --- Предложение курса ---
+// В data/courses.json — только факты из расписания. Модератор проверяет предложение
+// (без фамилий, оценок и контактов преподавателей) и добавляет курс вручную.
+
+async function handleCourseSuggest(request, env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ ok: false, error: 'auth_required' }, 401);
+  const body = await readJson(request);
+  const str = (value, max) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '');
+
+  const name = str(body?.name, 120);
+  if (!name) return json({ ok: false, error: 'course_name_required' }, 400);
+  if (!(await takeRateLimit(env, `course:${user.barcode}`))) return json({ ok: false, error: 'rate_limited' }, 429);
+
+  const year = Number(body?.course_year);
+  const credits = Number(body?.credits);
+  const line = (label, value) => (value ? `<b>${label}:</b> ${escapeHtml(value)}` : null);
+  await telegram(env, 'sendMessage', {
+    chat_id: env.MODERATOR_CHAT_ID,
+    text: [
+      '📘 <b>Курс: предложение</b>',
+      '',
+      line('Название', name),
+      line('Курс', [1, 2, 3, 4].includes(year) ? String(year) : null),
+      line('Кредиты', credits > 0 && credits <= 30 ? String(credits) : null),
+      line('Лекции', str(body?.lecturer, 80)),
+      line('Семинары', str(body?.seminar, 80)),
+      line('Комментарий', str(body?.comment, 300)),
+      line('Аккаунт', `${user.nickname} · баркод ${user.barcode}`),
+      '',
+      'Если всё верно — добавь в data/courses.json: имя и отчество без фамилии, без оценок и контактов.',
+    ].filter((l) => l !== null).join('\n'),
     parse_mode: 'HTML',
   });
   return json({ ok: true });

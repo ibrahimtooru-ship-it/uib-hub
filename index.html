@@ -89,7 +89,7 @@
   <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200/80 bg-white transition-transform duration-200 lg:translate-x-0" aria-label="Главное меню">
     <div class="flex items-center gap-2 pb-4 pl-6 pr-4 pt-6">
       <a href="#/knowledge" class="flex min-w-0 flex-1 items-center gap-3">
-        <span class="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-fuchsia-500 shadow-lg shadow-brand-500/30" data-emoji="cap" data-size="28"></span>
+        <img src="assets/icons/logo-64.png" alt="" width="44" height="44" class="h-11 w-11 flex-none rounded-2xl shadow-sm ring-1 ring-slate-200">
         <span>
           <span class="block font-display text-lg font-semibold leading-none text-slate-900">UIB Hub</span>
           <span class="text-xs font-medium text-slate-400">студенческий хаб</span>
@@ -102,7 +102,7 @@
       <div class="nav-label">Учёба</div>
       <a class="nav-item" data-route="knowledge" href="#/knowledge"><span data-emoji="books" data-size="22"></span>База знаний<span id="nav-count-knowledge" class="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"></span></a>
       <a class="nav-item" data-route="guide" href="#/guide"><span data-emoji="backpack" data-size="22"></span>Памятка первокурсника</a>
-      <a class="nav-item" data-route="teachers" href="#/teachers"><span data-emoji="shush" data-size="22"></span>Препод-конфиденциально</a>
+      <a class="nav-item" data-route="teachers" href="#/teachers"><span data-emoji="classical" data-size="22"></span>Курсы и преподаватели</a>
       <a class="nav-item" data-route="deadlines" href="#/deadlines"><span data-emoji="alarm" data-size="22"></span>Дедлайны<span id="nav-badge-deadlines" class="ml-auto hidden rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white"></span></a>
 
       <div class="nav-label">Сервисы</div>
@@ -111,6 +111,7 @@
 
       <div class="nav-label">Отдых</div>
       <a class="nav-item" data-route="memes" href="#/memes"><span data-emoji="skull" data-size="22"></span>Биржа мемов</a>
+      <button type="button" data-open-welcome class="nav-item w-full"><span data-emoji="question" data-size="22"></span>Как пользоваться</button>
     </nav>
 
     <div class="space-y-3 p-4">
@@ -310,10 +311,31 @@
 
       <!-- ЗАГЛУШКИ -->
       <section data-page="teachers" hidden>
-        <div class="card flex flex-col items-center px-6 py-16 text-center">
-          <span data-emoji="shush" data-size="96"></span>
-          <h1 class="mt-4 font-display text-2xl font-semibold text-slate-900">Препод-конфиденциально</h1>
-          <p class="mt-2 max-w-md text-slate-500">Анонимные советы: как преподаватель принимает работы, к чему придирается и что ценит. Скоро.</p>
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 class="page-title">Курсы и преподаватели</h1>
+            <p class="mt-1 text-sm text-slate-500">Кто ведёт лекции и семинары. Студенты дополняют список, модераторы проверяют.</p>
+          </div>
+          <button type="button" data-suggest-course class="btn-secondary"><span data-emoji="memo" data-size="18"></span>Предложить курс или исправление</button>
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <div id="courses-years" class="inline-flex rounded-xl bg-white p-1 ring-1 ring-slate-200" role="group" aria-label="Курс"></div>
+          <input id="courses-search" type="search" class="input min-w-0 flex-1 sm:max-w-xs" placeholder="Курс или преподаватель…">
+        </div>
+        <p id="courses-count" class="mt-6 text-sm font-semibold text-slate-500"></p>
+        <div id="courses-grid" class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+
+        <!-- Правила раздела: чтобы не было жалоб от преподавателей -->
+        <div class="mt-8 rounded-2xl bg-slate-50 p-5 text-sm text-slate-600 ring-1 ring-slate-100">
+          <h2 class="flex items-center gap-2 font-semibold text-slate-800"><span data-emoji="scales" data-size="20"></span>Правила раздела</h2>
+          <ul class="mt-2 list-disc space-y-1 pl-5">
+            <li>Только факты из расписания: курс, кредиты, кто ведёт лекции и семинары.</li>
+            <li>Преподаватели — по имени и отчеству, без фамилий, фото и контактов.</li>
+            <li>Никаких оценок, рейтингов и обсуждения личности. Советы к работам — только о требованиях: формат, сроки, критерии.</li>
+            <li>Вы преподаватель и не хотите, чтобы ваше имя было здесь? <a id="courses-contact" target="_blank" rel="noopener" class="font-semibold text-brand-700 hover:underline">Напишите модератору</a> — уберём.</li>
+          </ul>
+          <p class="mt-3 text-xs text-slate-400">UIB Hub — неофициальный студенческий проект и не связан с администрацией университета.</p>
         </div>
       </section>
       <section data-page="utils" hidden>
@@ -513,6 +535,81 @@
           <button type="button" data-modes="forgot reset" data-auth-mode="login" class="text-slate-500 hover:text-slate-800">← Назад ко входу</button>
         </div>
       </form>
+    </div>
+  </dialog>
+
+  <!-- Предложить курс или исправление -->
+  <dialog id="courses-suggest-dialog" class="sheet w-[min(560px,calc(100vw-32px))]">
+    <div class="p-4 sm:p-6">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="font-display text-lg font-semibold text-slate-900">Предложить курс</h2>
+          <p class="text-sm text-slate-500">Новый курс или исправление в существующем. Модераторы проверят и добавят.</p>
+        </div>
+        <button type="button" data-close class="btn-ghost -mr-2 -mt-1 shrink-0" aria-label="Закрыть">✕</button>
+      </div>
+      <form id="courses-suggest-form" class="mt-5 grid gap-3" novalidate>
+        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Название курса *
+          <input name="name" maxlength="120" class="input font-normal" placeholder="Как в Academo, без «26/27»">
+        </label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Курс
+            <select name="course_year" class="input font-normal"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+          </label>
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Кредиты
+            <input name="credits" type="number" min="1" max="30" class="input font-normal" placeholder="5">
+          </label>
+        </div>
+        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Лекции ведёт
+          <input name="lecturer" maxlength="80" class="input font-normal" placeholder="Имя Отчество, без фамилии">
+        </label>
+        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Семинары ведёт
+          <input name="seminar" maxlength="80" class="input font-normal" placeholder="Имя Отчество, без фамилии">
+        </label>
+        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Комментарий
+          <input name="comment" maxlength="300" class="input font-normal" placeholder="Например: что исправить">
+        </label>
+        <p class="rounded-xl bg-slate-50 p-3 text-xs text-slate-500 ring-1 ring-slate-100">Только факты из расписания. Оценки и отзывы о преподавателях не публикуем.</p>
+        <p id="courses-suggest-status" class="text-sm font-semibold empty:hidden" aria-live="polite"></p>
+        <div class="grid grid-cols-[auto_1fr] gap-2 sm:flex sm:justify-end">
+          <button type="button" data-close class="btn-secondary">Отмена</button>
+          <button type="submit" class="btn-primary disabled:opacity-60">Отправить модераторам</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Гайд при первом входе -->
+  <dialog id="welcome-dialog" class="sheet w-[min(560px,calc(100vw-32px))]">
+    <div class="p-4 sm:p-6">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-3">
+          <img src="assets/icons/logo-64.png" alt="" width="48" height="48" class="h-12 w-12 flex-none rounded-2xl ring-1 ring-slate-200">
+          <div class="min-w-0">
+            <h2 class="font-display text-lg font-semibold text-slate-900">Привет! Это UIB Hub</h2>
+            <p class="text-sm text-slate-500">Студенты помогают студентам: как сдавали, что спрашивают, что не пропустить.</p>
+          </div>
+        </div>
+        <button type="button" data-close class="btn-ghost -mr-2 -mt-1 shrink-0" aria-label="Закрыть">✕</button>
+      </div>
+
+      <ul class="mt-5 space-y-3 text-sm">
+        <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="books" data-size="28"></span><p><b class="text-slate-900">База знаний.</b> <span class="text-slate-600">Реальные работы с баллами, стеком и советами. Выбери кафедру и свою ОП.</span></p></li>
+        <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="classical" data-size="28"></span><p><b class="text-slate-900">Курсы и преподаватели.</b> <span class="text-slate-600">Кто ведёт лекции и семинары и какие требования к сдаче.</span></p></li>
+        <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="alarm" data-size="28"></span><p><b class="text-slate-900">Дедлайны.</b> <span class="text-slate-600">Скопируй «Шкалу времени» из Academo — срочное подсветится красным.</span></p></li>
+        <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="backpack" data-size="28"></span><p><b class="text-slate-900">Памятка первокурсника.</b> <span class="text-slate-600">Силлабус, рубежки, GPA, пересдачи и кабинеты простыми словами.</span></p></li>
+        <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="sparkles" data-size="28"></span><p><b class="text-slate-900">Делись и проси помощи.</b> <span class="text-slate-600">Войди по баркоду, чтобы добавить работу или заявку в маркетплейс. Всё проверяют модераторы.</span></p></li>
+      </ul>
+
+      <p class="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-100">
+        <b>Совет:</b> добавь сайт на экран «Домой» — откроется как приложение. iPhone: «Поделиться» → «На экран Домой». Android: меню ⋮ → «Добавить на главный экран».
+      </p>
+      <p class="mt-3 text-xs text-slate-400">Неофициальный студенческий проект, не связан с администрацией UIB.</p>
+
+      <div class="mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+        <button type="button" data-welcome-never class="btn-secondary">Больше не показывать</button>
+        <button type="button" data-close class="btn-primary">Понятно</button>
+      </div>
     </div>
   </dialog>
 
