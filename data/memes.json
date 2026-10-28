@@ -1,14 +1,4 @@
 {
   "version": 1,
-  "memes": [
-    {
-      "id": "meme-001",
-      "kind": "text",
-      "image_url": null,
-      "text": "Когда дедлайн в 23:59, а Academo упал в 23:58",
-      "author": { "display": "Аноним", "anonymous": true },
-      "reactions": { "relatable": 0, "w": 0 },
-      "created_at": "2026-10-26T23:59:00+05:00"
-    }
-  ]
+  "memes": []
 }

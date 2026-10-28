@@ -52,7 +52,8 @@ uib-hub/
 │   ├── deadlines.json         # общие дедлайны по группам
 │   ├── materials.json         # база знаний и баллов
 │   ├── marketplace.json       # объявления «Ищу / Предлагаю»
-│   ├── teachers.json          # «Препод-Конфиденциально»
+│   ├── tips.json              # «Препод-конфиденциально»: анонимные советы
+│   ├── courses.json           # курсы и кто ведёт — подсказки в формах
 │   └── memes.json             # «Биржа мемов и фейлов»
 ├── .github/workflows/
 │   ├── pages.yml              # (этап 0) деплой на GitHub Pages
@@ -164,10 +165,10 @@ uib-hub/
     {
       "id": "lst-001",
       "kind": "offer",                      // offer = «Предлагаю», request = «Ищу исполнителя»
-      "category": "presentation",           // notes | homework | presentation | tutoring | other
-      "title": "Презентации в Figma/PowerPoint",
+      "category": "tutoring",               // topic | tutoring | exam | notes | other
+      "title": "Объясню Java с нуля",
       "description": "…",
-      "subjects": ["Маркетинг"],
+      "subjects": ["Java"],
       "pricing": {
         "currency": "KZT",
         "price": 5000,                      // цена исполнителя
@@ -190,7 +191,7 @@ uib-hub/
 {
   "id": "ord-…",
   "listing_id": "lst-001",                  // null, если это открытая заявка
-  "category": "homework",
+  "category": "topic",
   "subject": "…", "task": "…", "deadline_at": "…", "comment": "…",
   "currency": "KZT",
   "price": 5000,
@@ -210,23 +211,29 @@ uib-hub/
 **Как включить монетизацию без переписывания:** все суммы считает `calcAmounts()`, а ссылку или действие для оплаты выбирает адаптер по `order.payment_mode`.
 Достаточно поменять в `config.js` `paymentMode: 'escrow'` и `serviceFeePercent: 10`, а затем реализовать `PAYMENT_ADAPTERS.escrow`.
 
-### `data/teachers.json`
+### `data/tips.json` — «Препод-конфиденциально»
+
+Анонимные советы. Пишут студенты после входа, публикует Worker после ✅ модератора. Автора в файле нет.
 
 ```jsonc
 {
   "version": 1,
-  "teachers": [
+  "tips": [
     {
-      "id": "t-001",
-      "display_name": "Преподаватель по сетям",   // как подписать решает модерация
-      "subjects": ["Компьютерные сети"],
-      "tips": [
-        { "id": "tip-001", "text": "Принимает лабы только с отчётом в PDF.", "tags": ["сдача"], "created_at": "…" }
-      ]
+      "id": "tip-…",
+      "course": "Основы облачных технологий AWS",   // или null
+      "teacher": "Александр Романович",            // имя и отчество, без фамилии; или null
+      "topic": "how",                              // how | focus | format | deadlines | attendance | other
+      "text": "…",                                 // 20–800 символов
+      "created_at": "…"
     }
   ]
 }
 ```
+
+### `data/courses.json`
+
+Курсы из расписания — подсказки в формах совета и работы: кто ведёт лекции и семинары. Только факты, преподаватели по имени и отчеству.
 
 ### `data/memes.json`
 

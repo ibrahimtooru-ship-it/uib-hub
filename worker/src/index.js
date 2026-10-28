@@ -7,7 +7,7 @@
 //   POST /auth/profile   ← выбрать аватарку
 //   POST /auth/reset-request ← «Забыл пароль»: заявка модераторам, они выдают одноразовый код лично
 //   POST /auth/reset     ← баркод + код от модератора + новый пароль
-//   POST /orders         ← заявка маркетплейса «Ищу исполнителя» (после входа) → в чат модераторов
+//   POST /orders         ← запрос «Репетиторство» (после входа) → в чат модераторов
 //   POST /tips           ← анонимный совет «Препод-конфиденциально» (после входа) → модераторам, ✅ → data/tips.json
 //   GET  /tips/votes     ← счётчики «Полезно» и свои голоса
 //   POST /tips/vote      ← «Полезно» (после входа), повторное нажатие снимает голос
@@ -359,11 +359,12 @@ async function handleSubmit(request, env) {
   return json({ ok: true, id: material.id });
 }
 
-// --- Заявка маркетплейса ---
+// --- Запрос «Репетиторство» ---
 // Раньше сайт открывал чат с модератором в Telegram; из своего же аккаунта это «Избранное».
 // Теперь заявка, как и работа, приходит карточкой в чат модераторов.
 
-const ORDER_CATEGORIES = { homework: 'Помощь с ДЗ / лабой', notes: 'Конспект', presentation: 'Презентация', tutoring: 'Репетиторство', other: 'Другое' };
+// Те же ключи в assets/js/marketplace.js
+const ORDER_CATEGORIES = { topic: 'Разобраться в теме', tutoring: 'Репетиторство', exam: 'Подготовка к рубежке / экзамену', notes: 'Конспекты лекций', other: 'Другое' };
 
 async function handleOrder(request, env) {
   const user = await currentUser(request, env);
@@ -384,11 +385,11 @@ async function handleOrder(request, env) {
   await telegram(env, 'sendMessage', {
     chat_id: env.MODERATOR_CHAT_ID,
     text: [
-      '🛒 <b>Заявка маркетплейса</b>',
+      '🙋 <b>Запрос помощи</b>',
       '',
       line('Категория', ORDER_CATEGORIES[body?.category] ?? 'Другое'),
       line('Предмет', subject),
-      line('Задача', task),
+      line('С чем помочь', task),
       // Время UIB (UTC+5) сдвигом вручную: в старых базах часовых поясов Asia/Almaty ещё UTC+6
       line('Дедлайн', Number.isNaN(deadline.getTime()) ? null : new Date(deadline.getTime() + 5 * 3600e3).toLocaleString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })),
       line('Бюджет', price ? `${price.toLocaleString('ru-RU')} ₸` : 'не указан'),

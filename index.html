@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>UIB Hub</title>
-  <meta name="description" content="База знаний студентов UIB: работы, баллы, советы. Плюс дедлайны Academo и маркетплейс услуг.">
+  <meta name="description" content="База знаний студентов UIB: работы, баллы, советы. Плюс дедлайны Academo и репетиторство.">
   <!-- Иконка и режим приложения: после «На экран Домой» сайт открывается без адресной строки -->
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
@@ -106,7 +106,7 @@
       <a class="nav-item" data-route="deadlines" href="#/deadlines"><span data-emoji="alarm" data-size="22"></span>Дедлайны<span id="nav-badge-deadlines" class="ml-auto hidden rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white"></span></a>
 
       <div class="nav-label">Сервисы</div>
-      <a class="nav-item" data-route="marketplace" href="#/marketplace"><span data-emoji="shopping" data-size="22"></span>Маркетплейс</a>
+      <a class="nav-item" data-route="marketplace" href="#/marketplace"><span data-emoji="open_book" data-size="22"></span>Репетиторство</a>
       <a class="nav-item" data-route="utils" href="#/utils"><span data-emoji="tools" data-size="22"></span>Утилиты</a>
 
       <div class="nav-label">Отдых</div>
@@ -288,17 +288,17 @@
 
       <!-- МАРКЕТПЛЕЙС (этап 3: пока только форма заявки) -->
       <section data-page="marketplace" hidden>
-        <h1 class="page-title">Маркетплейс</h1>
-        <p class="mt-1 text-sm text-slate-500">Лента «Ищу исполнителя / Предлагаю услуги» появится на этапе 3. Пока можно оставить заявку.</p>
+        <h1 class="page-title">Репетиторство</h1>
+        <p class="mt-1 text-sm text-slate-500">Найди того, кто объяснит тему, позанимается с тобой или поможет подготовиться к рубежке. Оставь запрос — модераторы подберут человека и напишут тебе.</p>
 
         <form id="order-form" class="card mt-6 grid max-w-2xl gap-4 p-4 sm:p-6 [&_.input]:w-full [&_label]:min-w-0" novalidate>
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Категория
               <select name="category" class="input font-normal">
-                <option value="homework">Помощь с ДЗ / лабой</option>
-                <option value="notes">Конспект</option>
-                <option value="presentation">Презентация</option>
+                <option value="topic">Разобраться в теме</option>
                 <option value="tutoring">Репетиторство</option>
+                <option value="exam">Подготовка к рубежке / экзамену</option>
+                <option value="notes">Конспекты лекций</option>
                 <option value="other">Другое</option>
               </select>
             </label>
@@ -306,8 +306,8 @@
               <input name="subject" class="input font-normal" required>
             </label>
           </div>
-          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Что нужно сделать
-            <textarea name="task" rows="3" class="input font-normal" required></textarea>
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">С чем нужна помощь
+            <textarea name="task" rows="3" class="input font-normal" placeholder="Например: не понимаю коллекции в Java, нужен разбор перед защитой" required></textarea>
           </label>
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Дедлайн
@@ -645,7 +645,7 @@
         <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="shush" data-size="28"></span><p><b class="text-slate-900">Препод-конфиденциально.</b> <span class="text-slate-600">Анонимные советы: как сдавать и на что обращает внимание преподаватель.</span></p></li>
         <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="alarm" data-size="28"></span><p><b class="text-slate-900">Дедлайны.</b> <span class="text-slate-600">Скопируй «Шкалу времени» из Academo — срочное подсветится красным.</span></p></li>
         <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="backpack" data-size="28"></span><p><b class="text-slate-900">Памятка первокурсника.</b> <span class="text-slate-600">Силлабус, рубежки, GPA, пересдачи и кабинеты простыми словами.</span></p></li>
-        <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="sparkles" data-size="28"></span><p><b class="text-slate-900">Делись и проси помощи.</b> <span class="text-slate-600">Войди по баркоду, чтобы добавить работу или заявку в маркетплейс. Всё проверяют модераторы.</span></p></li>
+        <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="sparkles" data-size="28"></span><p><b class="text-slate-900">Делись и проси помощи.</b> <span class="text-slate-600">Войди по баркоду, чтобы добавить работу или попросить помощи с темой. Всё проверяют модераторы.</span></p></li>
       </ul>
 
       <p class="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-100">

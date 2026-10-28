@@ -6,7 +6,7 @@ export const CONFIG = {
 
   TELEGRAM: {
     botUsername: 'uib_hub_mod_bot',   // бот модерации (работает через Worker)
-    ordersUsername: 'kuruta06',       // куда уходят заявки маркетплейса «Ищу исполнителя»
+    ordersUsername: 'kuruta06',       // куда уходят запросы «Репетиторство»
     moderatorUsername: 'kuruta06',    // кому уходят работы, пока API_BASE не задан
   },
 

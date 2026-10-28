@@ -7,6 +7,7 @@ export const EMOJI = {
   alarm: ['Alarm clock', '⏰'],
   calendar: ['Spiral calendar', '🗓️'],
   shopping: ['Shopping bags', '🛍️'],
+  open_book: ['Open book', '📖'],
   tools: ['Hammer and wrench', '🛠️'],
   shush: ['Shushing face', '🤫'],
   skull: ['Skull', '💀'],

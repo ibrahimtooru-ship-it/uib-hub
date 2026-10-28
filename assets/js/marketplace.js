@@ -15,11 +15,12 @@ const ORDER_ERRORS = {
   auth_required: 'Сессия закончилась. Войди заново и отправь ещё раз.',
 };
 
+// Те же ключи знает Worker
 const CATEGORY_LABELS = {
-  homework: 'Помощь с ДЗ / лабой',
-  notes: 'Конспект',
-  presentation: 'Презентация',
+  topic: 'Разобраться в теме',
   tutoring: 'Репетиторство',
+  exam: 'Подготовка к рубежке / экзамену',
+  notes: 'Конспекты лекций',
   other: 'Другое',
 };
 
@@ -29,7 +30,7 @@ export function calcAmounts(price, feePercent = CONFIG.MARKETPLACE.serviceFeePer
   return { price: base, service_fee_percent: feePercent, service_fee_amount: fee, total_amount: base + fee };
 }
 
-export function createOrder({ listingId = null, category = 'homework', subject, task, deadlineAt = null, price, comment = '' }) {
+export function createOrder({ listingId = null, category = 'topic', subject, task, deadlineAt = null, price, comment = '' }) {
   return {
     id: `ord-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     listing_id: listingId,
@@ -140,7 +141,7 @@ async function onSubmit(event) {
   }
 }
 
-// Префилл из кнопки «🔥 Не успеваешь?» на дашборде
+// Префилл из кнопки «Нужна помощь разобраться» у срочного дедлайна
 export function prefillOrder(params) {
   if (!form || !params.has('task')) return;
   form.elements.subject.value = params.get('subject') ?? '';
@@ -168,7 +169,7 @@ function renderSummary() {
   const amounts = calcAmounts(form.elements.price.value);
   const currency = CONFIG.MARKETPLACE.currency;
   summary.innerHTML = `
-    <div class="flex justify-between text-slate-500"><span>Цена исполнителя</span><span>${formatMoney(amounts.price, currency)}</span></div>
+    <div class="flex justify-between text-slate-500"><span>Стоимость помощи</span><span>${formatMoney(amounts.price, currency)}</span></div>
     <div class="mt-1 flex justify-between text-slate-500"><span>Сервисный сбор (${escapeHtml(amounts.service_fee_percent)}%)</span><span>${formatMoney(amounts.service_fee_amount, currency)}</span></div>
     <div class="mt-2 flex justify-between border-t border-slate-200 pt-2 font-bold text-slate-900"><span>Итого</span><span>${formatMoney(amounts.total_amount, currency)}</span></div>`;
 }

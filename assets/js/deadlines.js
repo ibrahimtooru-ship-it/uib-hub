@@ -256,7 +256,7 @@ function renderSidebar(items, now) {
 function deadlineCard(d, now) {
   const p = PRIORITIES[d.priority];
   const needsHelp = d.priority === 'critical' || d.priority === 'high';
-  const helpHref = `#/marketplace?${new URLSearchParams({ subject: d.course ?? '', task: d.title, deadline: d.due_at })}`;
+  const helpHref = `#/marketplace?${new URLSearchParams({ subject: d.course ?? '', task: `Разобраться перед дедлайном: ${d.title}`, deadline: d.due_at })}`;
   const isPersonal = d.source?.startsWith('academo');
 
   return `
@@ -283,7 +283,7 @@ function deadlineCard(d, now) {
       </div>
       ${needsHelp || d.url ? `
         <div class="mt-4 flex flex-wrap gap-2 sm:pl-16">
-          ${needsHelp ? `<a href="${escapeHtml(helpHref)}" class="btn-primary">${emoji('rocket', 18)}Не успеваешь? Заказать помощь</a>` : ''}
+          ${needsHelp ? `<a href="${escapeHtml(helpHref)}" class="btn-primary">${emoji('rocket', 18)}Нужна помощь разобраться</a>` : ''}
           ${d.url ? `<a href="${escapeHtml(safeUrl(d.url))}" target="_blank" rel="noopener" class="btn-secondary">Открыть в Academo ↗</a>` : ''}
         </div>` : ''}
     </li>`;
