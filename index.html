@@ -102,7 +102,7 @@
       <div class="nav-label">Учёба</div>
       <a class="nav-item" data-route="knowledge" href="#/knowledge"><span data-emoji="books" data-size="22"></span>База знаний<span id="nav-count-knowledge" class="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"></span></a>
       <a class="nav-item" data-route="guide" href="#/guide"><span data-emoji="backpack" data-size="22"></span>Памятка первокурсника</a>
-      <a class="nav-item" data-route="teachers" href="#/teachers"><span data-emoji="classical" data-size="22"></span>Курсы и преподаватели</a>
+      <a class="nav-item" data-route="teachers" href="#/teachers"><span data-emoji="shush" data-size="22"></span>Препод-конфиденциально</a>
       <a class="nav-item" data-route="deadlines" href="#/deadlines"><span data-emoji="alarm" data-size="22"></span>Дедлайны<span id="nav-badge-deadlines" class="ml-auto hidden rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white"></span></a>
 
       <div class="nav-label">Сервисы</div>
@@ -151,6 +151,22 @@
           </div>
           <dl id="kb-stats" class="mt-6 grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-4"></dl>
         </div>
+
+        <!-- Работы — только пример: Academo проверяет оригинальность -->
+        <aside class="mt-6 overflow-hidden rounded-2xl bg-white ring-1 ring-amber-200" aria-label="Работы — только пример">
+          <div class="flex gap-4 border-l-4 border-amber-400 p-4 sm:p-5">
+            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-amber-50" data-emoji="locked" data-size="30"></span>
+            <div class="min-w-0">
+              <h2 class="font-semibold text-slate-900">Работы здесь — только пример</h2>
+              <p class="mt-1 text-sm leading-relaxed text-slate-600">Смотри, как другие подошли к заданию, и делай своё. Academo проверяет каждую работу на антиплагиат по своей базе, поэтому одинаковую работу не примут, а балл могут обнулить.</p>
+              <ul class="mt-3 grid gap-1.5 text-sm text-slate-700 sm:grid-cols-3">
+                <li class="flex gap-1.5"><svg class="mt-0.5 shrink-0 text-emerald-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg><span>Идеи, структура, подход</span></li>
+                <li class="flex gap-1.5"><svg class="mt-0.5 shrink-0 text-emerald-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg><span>Советы и что ценит препод</span></li>
+                <li class="flex gap-1.5"><svg class="mt-0.5 shrink-0 text-red-500" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg><span>Копировать текст и код</span></li>
+              </ul>
+            </div>
+          </div>
+        </aside>
 
         <div class="mt-10 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -311,31 +327,53 @@
 
       <!-- ЗАГЛУШКИ -->
       <section data-page="teachers" hidden>
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 class="page-title">Курсы и преподаватели</h1>
-            <p class="mt-1 text-sm text-slate-500">Кто ведёт лекции и семинары. Студенты дополняют список, модераторы проверяют.</p>
+        <div class="mx-auto max-w-2xl">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <div class="min-w-0">
+              <h1 class="page-title flex items-center gap-2"><span data-emoji="shush" data-size="34"></span>Препод-конфиденциально</h1>
+              <p class="mt-1 text-sm text-slate-500">Анонимные советы студентов: как сдавать, на что преподаватель обращает внимание, что сделать заранее.</p>
+            </div>
+            <button type="button" data-write-tip class="btn-primary"><span data-emoji="memo" data-size="18"></span>Написать совет</button>
           </div>
-          <button type="button" data-suggest-course class="btn-secondary"><span data-emoji="memo" data-size="18"></span>Предложить курс или исправление</button>
-        </div>
 
-        <div class="mt-6 flex flex-wrap items-center gap-3">
-          <div id="courses-years" class="inline-flex rounded-xl bg-white p-1 ring-1 ring-slate-200" role="group" aria-label="Курс"></div>
-          <input id="courses-search" type="search" class="input min-w-0 flex-1 sm:max-w-xs" placeholder="Курс или преподаватель…">
-        </div>
-        <p id="courses-count" class="mt-6 text-sm font-semibold text-slate-500"></p>
-        <div id="courses-grid" class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+          <div class="mt-5 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <select id="tips-course" class="input" aria-label="Курс"><option value="">Все курсы</option></select>
+            <select id="tips-sort" class="input" aria-label="Сортировка">
+              <option value="useful">Сначала полезные</option>
+              <option value="new">Сначала новые</option>
+            </select>
+          </div>
+          <div id="tips-topics" class="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Тема"></div>
 
-        <!-- Правила раздела: чтобы не было жалоб от преподавателей -->
-        <div class="mt-8 rounded-2xl bg-slate-50 p-5 text-sm text-slate-600 ring-1 ring-slate-100">
-          <h2 class="flex items-center gap-2 font-semibold text-slate-800"><span data-emoji="scales" data-size="20"></span>Правила раздела</h2>
-          <ul class="mt-2 list-disc space-y-1 pl-5">
-            <li>Только факты из расписания: курс, кредиты, кто ведёт лекции и семинары.</li>
-            <li>Преподаватели — по имени и отчеству, без фамилий, фото и контактов.</li>
-            <li>Никаких оценок, рейтингов и обсуждения личности. Советы к работам — только о требованиях: формат, сроки, критерии.</li>
-            <li>Вы преподаватель и не хотите, чтобы ваше имя было здесь? <a id="courses-contact" target="_blank" rel="noopener" class="font-semibold text-brand-700 hover:underline">Напишите модератору</a> — уберём.</li>
-          </ul>
-          <p class="mt-3 text-xs text-slate-400">UIB Hub — неофициальный студенческий проект и не связан с администрацией университета.</p>
+          <p id="tips-count" class="mt-5 text-sm font-semibold text-slate-500 empty:hidden"></p>
+          <div id="tips-feed" class="mt-3 space-y-3"></div>
+
+          <!-- Правила: обсуждаем учёбу, а не человека — так не будет жалоб -->
+          <details class="mt-8 rounded-2xl bg-slate-50 p-5 text-sm text-slate-600 ring-1 ring-slate-100">
+            <summary class="flex cursor-pointer list-none items-center gap-2 font-semibold text-slate-800 [&::-webkit-details-marker]:hidden"><span data-emoji="scales" data-size="20"></span>Правила: что здесь можно писать</summary>
+            <div class="mt-3 grid gap-4 sm:grid-cols-2">
+              <div>
+                <p class="font-semibold text-emerald-700">Можно</p>
+                <ul class="mt-1 list-disc space-y-1 pl-5">
+                  <li>«Лабы принимает только с отчётом в PDF»</li>
+                  <li>«На защите спрашивает теорию — учи определения»</li>
+                  <li>«Строго по дедлайнам, опоздание −20%»</li>
+                  <li>«Ценит, если объяснишь, почему выбрал решение»</li>
+                </ul>
+              </div>
+              <div>
+                <p class="font-semibold text-red-600">Нельзя</p>
+                <ul class="mt-1 list-disc space-y-1 pl-5">
+                  <li>Оценки личности: «злая», «валит всех»</li>
+                  <li>Оскорбления, слухи, обвинения</li>
+                  <li>Внешность и личная жизнь</li>
+                  <li>Фамилии, телефоны, почта</li>
+                </ul>
+              </div>
+            </div>
+            <p class="mt-4">Советы публикуются после проверки модераторами. На сайте автор — всегда «Аноним». Вы преподаватель и хотите убрать своё имя или совет? <a id="tips-contact" target="_blank" rel="noopener" class="font-semibold text-brand-700 hover:underline">Напишите модератору</a> — уберём.</p>
+            <p class="mt-2 text-xs text-slate-400">UIB Hub — неофициальный студенческий проект и не связан с администрацией университета.</p>
+          </details>
         </div>
       </section>
       <section data-page="utils" hidden>
@@ -538,41 +576,44 @@
     </div>
   </dialog>
 
-  <!-- Предложить курс или исправление -->
-  <dialog id="courses-suggest-dialog" class="sheet w-[min(560px,calc(100vw-32px))]">
+  <!-- Написать совет -->
+  <dialog id="tips-compose" class="sheet w-[min(560px,calc(100vw-32px))]">
     <div class="p-4 sm:p-6">
       <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <h2 class="font-display text-lg font-semibold text-slate-900">Предложить курс</h2>
-          <p class="text-sm text-slate-500">Новый курс или исправление в существующем. Модераторы проверят и добавят.</p>
+        <div class="flex min-w-0 items-center gap-3">
+          <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-100" data-emoji="shush" data-size="30"></span>
+          <div class="min-w-0">
+            <h2 class="font-display text-lg font-semibold text-slate-900">Написать совет</h2>
+            <p class="text-sm text-slate-500">На сайте ты будешь «Анонимом».</p>
+          </div>
         </div>
         <button type="button" data-close class="btn-ghost -mr-2 -mt-1 shrink-0" aria-label="Закрыть">✕</button>
       </div>
-      <form id="courses-suggest-form" class="mt-5 grid gap-3" novalidate>
-        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Название курса *
-          <input name="name" maxlength="120" class="input font-normal" placeholder="Как в Academo, без «26/27»">
+      <form id="tips-form" class="mt-5 grid gap-3" novalidate>
+        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Курс
+          <select name="course" class="input font-normal"></select>
         </label>
-        <div class="grid grid-cols-2 gap-3">
-          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Курс
-            <select name="course_year" class="input font-normal"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+        <label class="hidden grid gap-1.5 text-sm font-semibold text-slate-700">Название курса
+          <input name="course_other" maxlength="120" class="input font-normal" placeholder="Как в Academo, без «26/27»">
+        </label>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Преподаватель
+            <select name="teacher" class="input font-normal"></select>
           </label>
-          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Кредиты
-            <input name="credits" type="number" min="1" max="30" class="input font-normal" placeholder="5">
+          <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Тема
+            <select name="topic" class="input font-normal"></select>
           </label>
         </div>
-        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Лекции ведёт
-          <input name="lecturer" maxlength="80" class="input font-normal" placeholder="Имя Отчество, без фамилии">
+        <label class="hidden grid gap-1.5 text-sm font-semibold text-slate-700">Имя и отчество преподавателя
+          <input name="teacher_other" maxlength="80" class="input font-normal" placeholder="Без фамилии">
         </label>
-        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Семинары ведёт
-          <input name="seminar" maxlength="80" class="input font-normal" placeholder="Имя Отчество, без фамилии">
+        <label class="grid gap-1.5 text-sm font-semibold text-slate-700"><span class="flex justify-between">Совет <span id="tips-counter" class="font-normal text-slate-400"></span></span>
+          <textarea name="text" rows="5" maxlength="900" class="input font-normal" placeholder="Как сдавать, что важно преподавателю, каких ошибок избегать…"></textarea>
         </label>
-        <label class="grid gap-1.5 text-sm font-semibold text-slate-700">Комментарий
-          <input name="comment" maxlength="300" class="input font-normal" placeholder="Например: что исправить">
-        </label>
-        <p class="rounded-xl bg-slate-50 p-3 text-xs text-slate-500 ring-1 ring-slate-100">Только факты из расписания. Оценки и отзывы о преподавателях не публикуем.</p>
-        <p id="courses-suggest-status" class="text-sm font-semibold empty:hidden" aria-live="polite"></p>
+        <p class="rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-500 ring-1 ring-slate-100">Пиши про учёбу, а не про человека: требования, формат, сроки. Оценки личности, оскорбления и фамилии модераторы не пропустят.</p>
+        <p id="tips-status" class="text-sm font-semibold empty:hidden" aria-live="polite"></p>
         <div class="grid grid-cols-[auto_1fr] gap-2 sm:flex sm:justify-end">
-          <button type="button" data-close class="btn-secondary">Отмена</button>
+          <button type="button" data-close class="btn-secondary">Закрыть</button>
           <button type="submit" class="btn-primary disabled:opacity-60">Отправить модераторам</button>
         </div>
       </form>
@@ -595,7 +636,7 @@
 
       <ul class="mt-5 space-y-3 text-sm">
         <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="books" data-size="28"></span><p><b class="text-slate-900">База знаний.</b> <span class="text-slate-600">Реальные работы с баллами, стеком и советами. Выбери кафедру и свою ОП.</span></p></li>
-        <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="classical" data-size="28"></span><p><b class="text-slate-900">Курсы и преподаватели.</b> <span class="text-slate-600">Кто ведёт лекции и семинары и какие требования к сдаче.</span></p></li>
+        <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="shush" data-size="28"></span><p><b class="text-slate-900">Препод-конфиденциально.</b> <span class="text-slate-600">Анонимные советы: как сдавать и на что обращает внимание преподаватель.</span></p></li>
         <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="alarm" data-size="28"></span><p><b class="text-slate-900">Дедлайны.</b> <span class="text-slate-600">Скопируй «Шкалу времени» из Academo — срочное подсветится красным.</span></p></li>
         <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="backpack" data-size="28"></span><p><b class="text-slate-900">Памятка первокурсника.</b> <span class="text-slate-600">Силлабус, рубежки, GPA, пересдачи и кабинеты простыми словами.</span></p></li>
         <li class="flex gap-3 rounded-2xl bg-slate-50 p-3"><span data-emoji="sparkles" data-size="28"></span><p><b class="text-slate-900">Делись и проси помощи.</b> <span class="text-slate-600">Войди по баркоду, чтобы добавить работу или заявку в маркетплейс. Всё проверяют модераторы.</span></p></li>
@@ -624,7 +665,8 @@
         <button type="button" data-close class="btn-ghost -mr-2 -mt-1 shrink-0" aria-label="Закрыть">✕</button>
       </div>
       <div id="viewer-body" class="mt-4"></div>
-      <div id="viewer-actions" class="mt-4 flex flex-wrap gap-2 sm:justify-end"></div>
+      <p class="mt-4 flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-100"><span data-emoji="locked" data-size="16"></span>Только для примера: не сдавай как свою — Academo проверит на антиплагиат.</p>
+      <div id="viewer-actions" class="mt-3 flex flex-wrap gap-2 sm:justify-end"></div>
     </div>
   </dialog>
 

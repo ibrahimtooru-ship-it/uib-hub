@@ -8,7 +8,10 @@
 //   POST /auth/reset-request ← «Забыл пароль»: заявка модераторам, они выдают одноразовый код лично
 //   POST /auth/reset     ← баркод + код от модератора + новый пароль
 //   POST /orders         ← заявка маркетплейса «Ищу исполнителя» (после входа) → в чат модераторов
-//   POST /courses/suggest ← новый курс или исправление (после входа) → модераторам, на сайт сам не попадает
+//   POST /tips           ← анонимный совет «Препод-конфиденциально» (после входа) → модераторам, ✅ → data/tips.json
+//   GET  /tips/votes     ← счётчики «Полезно» и свои голоса
+//   POST /tips/vote      ← «Полезно» (после входа), повторное нажатие снимает голос
+//   POST /tips/report    ← «Пожаловаться» → модераторам с кнопкой «Удалить совет»
 //   POST /submit        ← форма «Добавить работу» (только после входа; multipart: payload + необязательный file):
 //                          работа и файл уходят в очередь (KV) и модераторам в Telegram с кнопками ✅ / ❌
 //   GET  /files/:id      ← скачать файл работы (только после входа)
@@ -72,7 +75,10 @@ export default {
       if (route === 'POST /auth/reset-request') return withCors(env, await handleResetRequest(request, env));
       if (route === 'POST /auth/reset') return withCors(env, await handleReset(request, env));
       if (route === 'POST /orders') return withCors(env, await handleOrder(request, env));
-      if (route === 'POST /courses/suggest') return withCors(env, await handleCourseSuggest(request, env));
+      if (route === 'POST /tips') return withCors(env, await handleTipSubmit(request, env));
+      if (route === 'GET /tips/votes') return withCors(env, await handleTipVotes(request, env));
+      if (route === 'POST /tips/vote') return withCors(env, await handleTipVote(request, env));
+      if (route === 'POST /tips/report') return withCors(env, await handleTipReport(request, env));
       if (route === 'POST /submit') return withCors(env, await handleSubmit(request, env));
       if (request.method === 'GET' && pathname.startsWith('/files/')) return withCors(env, await handleDownload(request, env, pathname.slice(7)));
       return withCors(env, json({ ok: false, error: 'not_found' }, 404));
@@ -395,41 +401,189 @@ async function handleOrder(request, env) {
   return json({ ok: true });
 }
 
-// --- Предложение курса ---
-// В data/courses.json — только факты из расписания. Модератор проверяет предложение
-// (без фамилий, оценок и контактов преподавателей) и добавляет курс вручную.
+// --- Препод-конфиденциально: анонимные советы ---
+// На сайте автор всегда «Аноним», модераторы видят аккаунт. Публикуется только после ✅:
+// обсуждаем учёбу (как сдавать, на что обращает внимание), а не личность преподавателя.
 
-async function handleCourseSuggest(request, env) {
+const TIP_TOPICS = {
+  how: 'Как сдавать',
+  focus: 'На что обращает внимание',
+  format: 'Формат и оформление',
+  deadlines: 'Дедлайны и пересдачи',
+  attendance: 'Посещаемость',
+  other: 'Другое',
+};
+const TIP_TEXT = { min: 20, max: 800 };
+const TIP_ID_RE = /^tip-[a-z0-9-]{1,40}$/;
+
+function tipsPath(env) {
+  return env.TIPS_PATH ?? 'data/tips.json';
+}
+
+async function handleTipSubmit(request, env) {
   const user = await currentUser(request, env);
   if (!user) return json({ ok: false, error: 'auth_required' }, 401);
   const body = await readJson(request);
-  const str = (value, max) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '');
+  const str = (value, max) => (typeof value === 'string' ? value.trim().replace(/[ \t]+/g, ' ').slice(0, max) : '');
 
-  const name = str(body?.name, 120);
-  if (!name) return json({ ok: false, error: 'course_name_required' }, 400);
-  if (!(await takeRateLimit(env, `course:${user.barcode}`))) return json({ ok: false, error: 'rate_limited' }, 429);
+  const text = str(body?.text, TIP_TEXT.max + 1);
+  const course = str(body?.course, 120);
+  const teacher = str(body?.teacher, 80);
+  if (text.length < TIP_TEXT.min) return json({ ok: false, error: 'tip_too_short' }, 400);
+  if (text.length > TIP_TEXT.max) return json({ ok: false, error: 'tip_too_long' }, 400);
+  if (!course && !teacher) return json({ ok: false, error: 'tip_course_required' }, 400);
+  // Имя и отчество — два слова; третье почти всегда фамилия
+  if (teacher.split(' ').length > 2) return json({ ok: false, error: 'teacher_surname' }, 400);
+  if (!(await takeRateLimit(env, `tip:${user.barcode}`))) return json({ ok: false, error: 'rate_limited' }, 429);
 
-  const year = Number(body?.course_year);
-  const credits = Number(body?.credits);
-  const line = (label, value) => (value ? `<b>${label}:</b> ${escapeHtml(value)}` : null);
+  const tip = {
+    id: `tip-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`,
+    course: course || null,
+    teacher: teacher || null,
+    topic: TIP_TOPICS[body?.topic] ? body.topic : 'other',
+    text,
+    created_at: new Date().toISOString(),
+  };
+  await env.SUBMISSIONS.put(`pendingtip:${tip.id}`, JSON.stringify({ tip, account: { barcode: user.barcode, nickname: user.nickname } }), { expirationTtl: PENDING_TTL });
   await telegram(env, 'sendMessage', {
     chat_id: env.MODERATOR_CHAT_ID,
     text: [
-      '📘 <b>Курс: предложение</b>',
+      '🤫 <b>Совет: Препод-конфиденциально</b>',
       '',
-      line('Название', name),
-      line('Курс', [1, 2, 3, 4].includes(year) ? String(year) : null),
-      line('Кредиты', credits > 0 && credits <= 30 ? String(credits) : null),
-      line('Лекции', str(body?.lecturer, 80)),
-      line('Семинары', str(body?.seminar, 80)),
-      line('Комментарий', str(body?.comment, 300)),
-      line('Аккаунт', `${user.nickname} · баркод ${user.barcode}`),
+      formatTip(tip),
       '',
-      'Если всё верно — добавь в data/courses.json: имя и отчество без фамилии, без оценок и контактов.',
-    ].filter((l) => l !== null).join('\n'),
+      `<b>Аккаунт:</b> ${escapeHtml(user.nickname)} · баркод ${user.barcode} (на сайте — «Аноним»)`,
+      '',
+      'Публикуем, если про учёбу: как сдавать, что важно, формат, сроки. Не публикуем оценки личности, оскорбления, слухи, фамилии и контакты.',
+    ].join('\n'),
     parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '✅ Опубликовать', callback_data: `ta:${tip.id}` },
+        { text: '❌ Отклонить', callback_data: `tr:${tip.id}` },
+      ]],
+    },
+  });
+  return json({ ok: true, id: tip.id });
+}
+
+function formatTip(tip) {
+  return [
+    tip.course && `<b>Курс:</b> ${escapeHtml(tip.course)}`,
+    tip.teacher && `<b>Преподаватель:</b> ${escapeHtml(tip.teacher)}`,
+    `<b>Тема:</b> ${TIP_TOPICS[tip.topic]}`,
+    `<b>Совет:</b> ${escapeHtml(tip.text)}`,
+  ].filter(Boolean).join('\n');
+}
+
+// «Полезно»: один голос на аккаунт, повторное нажатие снимает голос. Счётчики — в одном ключе KV
+async function handleTipVote(request, env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ ok: false, error: 'auth_required' }, 401);
+  const id = String((await readJson(request))?.id ?? '');
+  if (!TIP_ID_RE.test(id)) return json({ ok: false, error: 'bad_tip' }, 400);
+
+  const voteKey = `vote:${id}:${user.barcode}`;
+  const counts = JSON.parse(await env.SUBMISSIONS.get('tipvotes') ?? '{}');
+  const voted = Boolean(await env.SUBMISSIONS.get(voteKey));
+  if (voted) {
+    await env.SUBMISSIONS.delete(voteKey);
+    counts[id] = Math.max(0, (counts[id] ?? 1) - 1);
+  } else {
+    await env.SUBMISSIONS.put(voteKey, '1');
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  await env.SUBMISSIONS.put('tipvotes', JSON.stringify(counts));
+  // Свои голоса пользователь видит на любом устройстве
+  const mine = new Set(JSON.parse(await env.SUBMISSIONS.get(`myvotes:${user.barcode}`) ?? '[]'));
+  if (voted) mine.delete(id); else mine.add(id);
+  await env.SUBMISSIONS.put(`myvotes:${user.barcode}`, JSON.stringify([...mine]));
+  return json({ ok: true, count: counts[id], voted: !voted });
+}
+
+async function handleTipVotes(request, env) {
+  const user = await currentUser(request, env);
+  const counts = JSON.parse(await env.SUBMISSIONS.get('tipvotes') ?? '{}');
+  const mine = user ? JSON.parse(await env.SUBMISSIONS.get(`myvotes:${user.barcode}`) ?? '[]') : [];
+  return json({ ok: true, counts, mine });
+}
+
+// «Пожаловаться»: совет уходит модераторам с кнопкой «Удалить»; сам по себе не скрывается,
+// чтобы жалобой нельзя было убрать честный совет
+async function handleTipReport(request, env) {
+  const user = await currentUser(request, env);
+  if (!user) return json({ ok: false, error: 'auth_required' }, 401);
+  const body = await readJson(request);
+  const id = String(body?.id ?? '');
+  const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
+  if (!TIP_ID_RE.test(id)) return json({ ok: false, error: 'bad_tip' }, 400);
+  if (!(await takeRateLimit(env, `report:${user.barcode}`))) return json({ ok: false, error: 'rate_limited' }, 429);
+
+  await telegram(env, 'sendMessage', {
+    chat_id: env.MODERATOR_CHAT_ID,
+    text: [
+      '⚑ <b>Жалоба на совет</b>',
+      '',
+      `<b>Совет:</b> ${id}`,
+      reason && `<b>Причина:</b> ${escapeHtml(reason)}`,
+      `<b>Пожаловался:</b> ${escapeHtml(user.nickname)} · баркод ${user.barcode}`,
+      '',
+      'Текст совета — на сайте в разделе «Препод-конфиденциально».',
+    ].filter(Boolean).join('\n'),
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '🗑 Удалить совет', callback_data: `td:${id}` },
+        { text: '👌 Оставить', callback_data: `tk:${id}` },
+      ]],
+    },
   });
   return json({ ok: true });
+}
+
+async function handleTipCallback(env, callback, action, id, who) {
+  if (action === 'tk') {
+    await closeCard(env, callback, `👌 Оставлено — ${who}`);
+    return;
+  }
+  if (action === 'td') {
+    try {
+      await commitJson(env, tipsPath(env), `Удалён совет ${id} по жалобе`, (data) => {
+        data.tips = (data.tips ?? []).filter((t) => t.id !== id);
+      });
+    } catch (err) {
+      console.error(err);
+      await answer(env, callback, `Не удалось удалить: ${String(err.message).slice(0, 150)}`);
+      return;
+    }
+    await closeCard(env, callback, `🗑 Удалено — ${who}`);
+    return;
+  }
+
+  const key = `pendingtip:${id}`;
+  const raw = await env.SUBMISSIONS.get(key);
+  if (!raw) {
+    await answer(env, callback, 'Этот совет уже обработан');
+    return;
+  }
+  await env.SUBMISSIONS.delete(key);
+  if (action === 'tr') {
+    await closeCard(env, callback, `❌ Отклонено — ${who}`);
+    return;
+  }
+  const { tip } = JSON.parse(raw);
+  try {
+    await commitJson(env, tipsPath(env), `Новый совет: ${tip.course ?? tip.teacher}`, (data) => {
+      data.tips ??= [];
+      if (!data.tips.some((t) => t.id === tip.id)) data.tips.push(tip);
+    });
+  } catch (err) {
+    console.error(err);
+    await env.SUBMISSIONS.put(key, raw, { expirationTtl: PENDING_TTL });
+    await answer(env, callback, `Не удалось опубликовать: ${String(err.message).slice(0, 150)}`);
+    return;
+  }
+  await closeCard(env, callback, `✅ Опубликовано — ${who}`);
 }
 
 function describeFile(file) {
@@ -557,6 +711,11 @@ async function handleTelegram(request, env) {
     await issueResetCode(env, callback, id);
     return new Response('ok');
   }
+  if (['ta', 'tr', 'td', 'tk'].includes(action)) {
+    const who = callback.from?.username ? `@${callback.from.username}` : (callback.from?.first_name ?? 'модератор');
+    await handleTipCallback(env, callback, action, id, who);
+    return new Response('ok');
+  }
   const key = `pending:${id}`;
   const raw = await env.SUBMISSIONS.get(key);
   if (!raw) {
@@ -623,33 +782,40 @@ async function telegram(env, method, payload) {
 }
 
 // --- Публикация в GitHub ---
-// Git Data API: один коммит с materials.json, значит одна сборка Pages на работу
+// Git Data API: один коммит на изменение, значит одна сборка Pages
 
 async function publish(env, { material, attachment }) {
-  const repo = `repos/${env.GITHUB_REPO}`;
-  const branch = encodeURIComponent(env.GITHUB_BRANCH);
-  const identity = { name: env.COMMIT_NAME, email: env.COMMIT_EMAIL };
-
   const entry = structuredClone(material);
   // Ссылки на файл в репозитории нет: сайт скачивает его через /files/:id после входа
   if (attachment) entry.links.unshift({ label: attachment.name, file: true, size: attachment.size });
+  await commitJson(env, env.MATERIALS_PATH, `Новая работа: ${material.subject} — ${material.work}`, (data) => {
+    data.materials ??= [];
+    if (!data.materials.some((m) => m.id === entry.id)) data.materials.push(entry);
+  });
+}
+
+// Читает JSON из репозитория, даёт его изменить и коммитит обратно. Файла ещё нет — начинаем с {}
+async function commitJson(env, path, message, update) {
+  const repo = `repos/${env.GITHUB_REPO}`;
+  const branch = encodeURIComponent(env.GITHUB_BRANCH);
+  const identity = { name: env.COMMIT_NAME, email: env.COMMIT_EMAIL };
 
   // Если ветка ушла вперёд между чтением и записью, GitHub вернёт 422 — перечитываем и пробуем снова
   for (let attempt = 0; attempt < 3; attempt++) {
     const head = await github(env, 'GET', `${repo}/git/ref/heads/${branch}`);
     const parent = await github(env, 'GET', `${repo}/git/commits/${head.object.sha}`);
-    const current = await github(env, 'GET', `${repo}/contents/${env.MATERIALS_PATH}?ref=${head.object.sha}`);
-    const data = JSON.parse(fromBase64(current.content));
-    data.materials ??= [];
-    if (!data.materials.some((m) => m.id === entry.id)) data.materials.push(entry);
+    const current = await githubRaw(env, 'GET', `${repo}/contents/${path}?ref=${head.object.sha}`);
+    if (!current.ok && current.status !== 404) throw new Error(`GitHub ${current.status}`);
+    const data = current.ok ? JSON.parse(fromBase64((await current.json()).content)) : { version: 1 };
+    update(data);
 
     const blob = await github(env, 'POST', `${repo}/git/blobs`, { content: toBase64(`${JSON.stringify(data, null, 2)}\n`), encoding: 'base64' });
     const tree = await github(env, 'POST', `${repo}/git/trees`, {
       base_tree: parent.tree.sha,
-      tree: [{ path: env.MATERIALS_PATH, mode: '100644', type: 'blob', sha: blob.sha }],
+      tree: [{ path, mode: '100644', type: 'blob', sha: blob.sha }],
     });
     const commit = await github(env, 'POST', `${repo}/git/commits`, {
-      message: `Новая работа: ${material.subject} — ${material.work}`,
+      message,
       tree: tree.sha,
       parents: [head.object.sha],
       author: identity,

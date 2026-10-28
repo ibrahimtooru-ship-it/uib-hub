@@ -3,7 +3,7 @@
 // • иначе — готовое сообщение модератору в Telegram (одна кнопка «Отправить»).
 import { api, currentUser, onAuthChange, requireLogin } from './auth.js';
 import { CONFIG } from './config.js';
-import { courseTeachers, coursesReady } from './courses.js';
+import { courseTeachers, coursesReady } from './tips.js';
 import { escapeHtml, safeUrl } from './utils.js';
 import { getCatalog, materialCard, materialsReady } from './materials.js';
 

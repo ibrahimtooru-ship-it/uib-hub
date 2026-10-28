@@ -33,15 +33,6 @@ export function getCatalog() {
   };
 }
 
-// «Работы по курсу» со страницы курсов: открываем базу знаний с поиском по предмету
-export function showWorks(query) {
-  resetFilters();
-  el.search.value = query;
-  state.query = query.toLowerCase();
-  render();
-  location.hash = '#/knowledge';
-}
-
 export async function initMaterials() {
   for (const id of ['search', 'stats', 'directions', 'programs', 'years', 'subject', 'teacher', 'sort', 'reset', 'tools', 'count', 'grid']) {
     el[id] = document.getElementById(`kb-${id}`);

@@ -131,6 +131,25 @@ check('courses.json: только факты, преподаватели без 
   ];
 });
 
+check('tips.json: анонимно, темы, без фамилий', () => {
+  const tips = json('data/tips.json').tips;
+  const topics = ['how', 'focus', 'format', 'deadlines', 'attendance', 'other'];
+  return [
+    ...duplicates(tips.map((t) => t.id)).map((id) => `совет повторяется: ${id}`),
+    ...tips.flatMap((t) => {
+      const problems = [];
+      if (!/^tip-[a-z0-9-]+$/.test(t.id ?? '')) problems.push(`кривой id: ${t.id}`);
+      if (!topics.includes(t.topic)) problems.push(`${t.id}: тема «${t.topic}»`);
+      if (!t.text || t.text.length < 20 || t.text.length > 800) problems.push(`${t.id}: длина текста`);
+      if (!t.course && !t.teacher) problems.push(`${t.id}: нет курса и преподавателя`);
+      if (t.teacher && t.teacher.trim().split(/\s+/).length > 2) problems.push(`${t.id}: «${t.teacher}» — похоже на фамилию`);
+      if ('author' in t || 'barcode' in t) problems.push(`${t.id}: в совете есть автор`);
+      if (!isDate(t.created_at)) problems.push(`${t.id}: дата`);
+      return problems;
+    }),
+  ];
+});
+
 check('guide.json: разделы, эмодзи, таблицы', () => {
   const guide = json('data/guide.json');
   return [
@@ -163,7 +182,7 @@ check('index.html: все id, которые ищет JS, существуют',
     ['assets/js/materials.js', 'kb-', /for \(const id of \[([^\]]+)\]\)/],
     ['assets/js/guide.js', 'guide-', /for \(const id of \[([^\]]+)\]\)/],
     ['assets/js/auth.js', 'auth-', /for \(const id of \[([^\]]+)\]\)/],
-    ['assets/js/courses.js', 'courses-', /for \(const id of \[([^\]]+)\]\)/],
+    ['assets/js/tips.js', 'tips-', /for \(const id of \[([^\]]+)\]\)/],
   ]) {
     const names = read(file).match(list)?.[1].match(/'([^']+)'/g) ?? [];
     for (const name of names) wanted.push([file, prefix + name.slice(1, -1)]);
@@ -201,7 +220,7 @@ await checkAsync('Разбор .ics', async () => {
 
 // --- Worker (Telegram, GitHub и KV — заглушки, в сеть ничего не уходит) ---
 
-await checkAsync('Worker: аккаунты, сброс пароля, аватарки, работы, заявки, файлы', async () => {
+await checkAsync('Worker: аккаунты, сброс пароля, аватарки, работы, заявки, файлы, советы', async () => {
   const worker = (await importLocal('worker/src/index.js')).default;
   // KV в памяти: значение + metadata, как в Cloudflare
   const kv = new Map();
@@ -429,16 +448,53 @@ await checkAsync('Worker: аккаунты, сброс пароля, авата�
     res = await call('GET', '/auth/me', { token: 'legacy-token-0123456789abcdef' });
     expect(res.status === 200, 'сессия старого формата перестала работать');
 
-    // --- Предложение курса: только модераторам ---
-    res = await call('POST', '/courses/suggest', { body: { name: 'Цифровая схемотехника' } });
-    expect(res.status === 401, 'курс предложен без входа');
-    res = await call('POST', '/courses/suggest', { body: { name: '   ' }, token });
-    expect(res.status === 400 && (await res.json()).error === 'course_name_required', 'принят курс без названия');
+    // --- Препод-конфиденциально: анонимные советы через модераторов ---
+    const tipText = 'Лабы принимает только с отчётом в PDF, на защите спрашивает теорию.';
+    res = await call('POST', '/tips', { body: { course: 'ООП на Java', topic: 'how', text: tipText } });
+    expect(res.status === 401, 'совет принят без входа');
+    res = await call('POST', '/tips', { body: { course: 'ООП на Java', topic: 'how', text: 'коротко' }, token });
+    expect(res.status === 400 && (await res.json()).error === 'tip_too_short', 'принят слишком короткий совет');
+    res = await call('POST', '/tips', { body: { course: 'ООП на Java', teacher: 'Иванова Анна Петровна', topic: 'how', text: tipText }, token });
+    expect(res.status === 400 && (await res.json()).error === 'teacher_surname', 'принят преподаватель с фамилией');
     telegram.length = 0;
-    res = await call('POST', '/courses/suggest', { body: { name: 'Цифровая   схемотехника', course_year: '3', credits: '5', lecturer: 'Назгуль Меиркановна' }, token });
-    const courseCard = telegram.find((t) => t.method === 'sendMessage')?.body.text ?? '';
-    expect(res.status === 200 && courseCard.includes('Цифровая схемотехника') && courseCard.includes('Назгуль Меиркановна') && courseCard.includes('1111111'), `карточка курса: ${courseCard}`);
-    expect(!github.files().some((f) => f.includes('courses')), 'предложение курса само попало в репозиторий');
+    res = await call('POST', '/tips', { body: { course: 'ООП на Java', teacher: 'Багила Кенесовна', topic: 'focus', text: tipText }, token });
+    const { id: tipId } = await res.json();
+    const tipCard = telegram.find((t) => t.method === 'sendMessage')?.body;
+    expect(res.status === 200 && tipCard?.reply_markup?.inline_keyboard?.[0]?.[0]?.callback_data === `ta:${tipId}` && tipCard.text.includes('1111111'), `совет не дошёл до модераторов: ${res.status}`);
+    expect(!github.files().includes('data/tips.json'), 'совет попал на сайт до проверки');
+
+    await press(`ta:${tipId}`, 999);
+    expect(!github.files().includes('data/tips.json'), 'совет опубликован из чужого чата');
+    await press(`ta:${tipId}`);
+    const tips = () => JSON.parse(github.read('data/tips.json') ?? '{"tips":[]}').tips;
+    const publishedTip = tips().find((t) => t.id === tipId);
+    expect(publishedTip?.teacher === 'Багила Кенесовна' && publishedTip.topic === 'focus', 'совет не опубликован');
+    expect(!JSON.stringify(tips()).includes('1111111') && !JSON.stringify(tips()).includes('Кот'), 'в опубликованном совете виден автор');
+    await press(`ta:${tipId}`);
+    expect(tips().filter((t) => t.id === tipId).length === 1, 'совет опубликован дважды');
+
+    res = await call('POST', '/tips', { body: { course: 'Философия', topic: 'how', text: 'Это плохой совет, который не пройдёт модерацию.' }, token });
+    const { id: rejectedTip } = await res.json();
+    await press(`tr:${rejectedTip}`);
+    expect(!tips().some((t) => t.id === rejectedTip) && !kv.has(`pendingtip:${rejectedTip}`), 'отклонённый совет остался');
+
+    res = await call('POST', '/tips/vote', { body: { id: tipId } });
+    expect(res.status === 401, '«Полезно» без входа');
+    res = await call('POST', '/tips/vote', { body: { id: tipId }, token });
+    expect((await res.json()).count === 1, '«Полезно» не засчитано');
+    res = await call('GET', '/tips/votes', { token });
+    const votes = await res.json();
+    expect(votes.counts?.[tipId] === 1 && votes.mine?.includes(tipId), 'счётчики «Полезно»');
+    res = await call('POST', '/tips/vote', { body: { id: tipId }, token });
+    expect((await res.json()).count === 0, 'повторное «Полезно» не сняло голос');
+
+    telegram.length = 0;
+    res = await call('POST', '/tips/report', { body: { id: tipId, reason: 'неправда' }, token });
+    const report = telegram.find((t) => t.method === 'sendMessage')?.body;
+    expect(res.status === 200 && report?.reply_markup?.inline_keyboard?.[0]?.[0]?.callback_data === `td:${tipId}`, 'жалоба не дошла до модераторов');
+    expect(tips().some((t) => t.id === tipId), 'жалоба сама скрыла совет');
+    await press(`td:${tipId}`);
+    expect(!tips().some((t) => t.id === tipId), '«Удалить совет» не убрал его с сайта');
 
     await call('POST', '/auth/logout', { token });
     res = await call('GET', '/auth/me', { token });
@@ -473,7 +529,9 @@ function fakeGitHub(initialFiles) {
       if (path.startsWith('git/commits/')) return reply({ tree: { sha: commitTrees.get(path.split('/').pop()) } });
       if (path.startsWith('contents/')) {
         const [file, query] = path.slice('contents/'.length).split('?ref=');
-        return reply({ content: trees.get(commitTrees.get(query)).get(file).toString('base64') });
+        const bytes = trees.get(commitTrees.get(query)).get(file);
+        // Как настоящий GitHub: файла ещё нет — 404
+        return bytes ? reply({ content: bytes.toString('base64') }) : reply({ message: 'Not Found' }, 404);
       }
       if (path === 'git/blobs') {
         const sha = `b${++counter}`;
