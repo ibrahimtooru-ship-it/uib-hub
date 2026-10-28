@@ -16,6 +16,7 @@ const state = {
   teacher: '',
   sort: 'new',
   tools: new Set(),
+  toolsExpanded: false,
 };
 
 const el = {};
@@ -125,6 +126,11 @@ function bindEvents() {
     render();
   });
   el.tools.addEventListener('click', (event) => {
+    if (event.target.closest('[data-tools-toggle]')) {
+      state.toolsExpanded = !state.toolsExpanded;
+      renderTools();
+      return;
+    }
     const chip = event.target.closest('[data-tool]');
     if (!chip) return;
     const tool = chip.dataset.tool;
@@ -243,13 +249,23 @@ function fillTeachers() {
     teachers.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join(''));
 }
 
+// Инструментов много — показываем самые частые, остальные под «Показать ещё».
+// Выбранные видны всегда, даже если они не в первой восьмёрке
+const TOOLS_COLLAPSED = 8;
+
 function renderTools() {
-  el.tools.innerHTML = uniqueSorted(state.items.flatMap((m) => m.stack ?? []))
-    .map((tool) => {
-      const active = state.tools.has(tool);
-      return `<button type="button" class="chip ${active ? 'is-active' : ''}" data-tool="${escapeHtml(tool)}" aria-pressed="${active}">${escapeHtml(tool)}</button>`;
-    })
-    .join('');
+  const usage = new Map();
+  for (const tool of state.items.flatMap((m) => m.stack ?? [])) usage.set(tool, (usage.get(tool) ?? 0) + 1);
+  const all = [...usage.keys()].sort((a, b) => usage.get(b) - usage.get(a) || a.localeCompare(b, 'ru'));
+  const visible = state.toolsExpanded ? all : all.filter((tool, i) => i < TOOLS_COLLAPSED || state.tools.has(tool));
+  const hidden = all.length - visible.length;
+
+  el.tools.innerHTML = visible.map((tool) => {
+    const active = state.tools.has(tool);
+    return `<button type="button" class="chip ${active ? 'is-active' : ''}" data-tool="${escapeHtml(tool)}" aria-pressed="${active}">${escapeHtml(tool)}</button>`;
+  }).join('') + (all.length > TOOLS_COLLAPSED
+    ? `<button type="button" data-tools-toggle class="rounded-full px-3 py-1.5 text-xs font-bold text-brand-700 transition hover:bg-brand-50">${state.toolsExpanded ? 'Свернуть' : `Показать ещё · ${hidden}`}</button>`
+    : '');
 }
 
 function matches(m) {

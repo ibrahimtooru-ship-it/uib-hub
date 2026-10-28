@@ -3,6 +3,7 @@ import { emoji } from './emoji.js';
 import { escapeHtml, fetchJson, safeUrl, storage } from './utils.js';
 
 const CHECKLIST_KEY = 'uibhub.guide.checklist';
+const CHECKLIST_HIDDEN_KEY = 'uibhub.guide.checklistHidden';
 
 const el = {};
 let glossary = [];
@@ -32,12 +33,28 @@ export async function initGuide() {
 }
 
 // Отметки чеклиста личные, поэтому живут в localStorage
+// Чеклист можно скрыть кнопкой; когда отмечены все пункты, он скрывается сам
+function setChecklistHidden(hidden) {
+  storage.set(CHECKLIST_HIDDEN_KEY, hidden);
+  document.getElementById('guide-checklist-box').classList.toggle('hidden', hidden);
+  document.getElementById('guide-checklist-show').classList.toggle('hidden', !hidden);
+}
+
 function renderChecklist(items) {
   const done = new Set(storage.get(CHECKLIST_KEY, []));
+  const doneNote = document.getElementById('guide-checklist-done');
+  let hideTimer = null;
   const updateProgress = () => {
     const count = items.filter((item) => done.has(item.id)).length;
     el.progress.textContent = `${count} из ${items.length}`;
+    const complete = count === items.length;
+    doneNote.classList.toggle('hidden', !complete);
+    clearTimeout(hideTimer);
+    if (complete) hideTimer = setTimeout(() => setChecklistHidden(true), 2500);
   };
+  document.getElementById('guide-checklist-hide').addEventListener('click', () => setChecklistHidden(true));
+  document.getElementById('guide-checklist-show').addEventListener('click', () => setChecklistHidden(false));
+  setChecklistHidden(storage.get(CHECKLIST_HIDDEN_KEY, false));
 
   el.checklist.innerHTML = items.map((item) => `
     <label class="flex cursor-pointer items-start gap-3 rounded-xl p-2.5 transition hover:bg-white/60">
