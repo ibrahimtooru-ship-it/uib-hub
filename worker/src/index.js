@@ -15,7 +15,8 @@
 //   POST /submit        ← форма «Добавить работу» (только после входа; multipart: payload + необязательный file):
 //                          работа и файл уходят в очередь (KV) и модераторам в Telegram с кнопками ✅ / ❌
 //   GET  /files/:id      ← скачать файл работы (только после входа)
-//   POST /telegram       ← webhook бота: ✅ публикует работу в materials.json (файл остаётся закрытым в KV),
+//   POST /telegram       ← webhook бота: команда /stats в чате модераторов;
+//                          ✅ публикует работу в materials.json (файл остаётся закрытым в KV),
 //                          ❌ удаляет заявку и файл
 //
 // Секреты (wrangler secret put): TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, GITHUB_TOKEN
@@ -698,6 +699,10 @@ async function handleTelegram(request, env) {
     return new Response('forbidden', { status: 403 });
   }
   const update = await request.json();
+  if (update.message) {
+    await handleCommand(env, update.message);
+    return new Response('ok');
+  }
   const callback = update.callback_query;
   if (!callback?.data) return new Response('ok');
 
@@ -754,6 +759,78 @@ async function handleTelegram(request, env) {
     await closeCard(env, callback, `❌ Отклонено — ${who}`);
   }
   return new Response('ok');
+}
+
+// --- Команды в чате модераторов ---
+
+async function handleCommand(env, message) {
+  // «/stats» или «/stats@uib_hub_mod_bot»; в других чатах бот молчит
+  const command = String(message.text ?? '').trim().split(/\s/)[0].split('@')[0].toLowerCase();
+  if (command !== '/stats' || String(message.chat?.id) !== String(env.MODERATOR_CHAT_ID)) return;
+  let text;
+  try {
+    text = await statsText(env);
+  } catch (err) {
+    console.error(err);
+    text = `Не удалось собрать статистику: ${escapeHtml(String(err.message).slice(0, 150))}`;
+  }
+  await telegram(env, 'sendMessage', {
+    chat_id: message.chat.id,
+    reply_to_message_id: message.message_id,
+    parse_mode: 'HTML',
+    text,
+  });
+}
+
+async function statsText(env) {
+  const [users, sessions, pendingWorks, pendingTips, files, materials, tips] = await Promise.all([
+    listKeys(env, 'user:'),
+    listKeys(env, 'session:'),
+    listKeys(env, 'pending:'),
+    listKeys(env, 'pendingtip:'),
+    listKeys(env, 'stored:'),
+    readRepoJson(env, env.MATERIALS_PATH),
+    readRepoJson(env, tipsPath(env)),
+  ]);
+  // Новые аккаунты за сутки и неделю — по дате регистрации в записи
+  const records = await Promise.all(users.map((k) => env.SUBMISSIONS.get(k, 'json')));
+  const since = (days) => records.filter((u) => u?.created_at && Date.now() - Date.parse(u.created_at) < days * 864e5).length;
+  // Сессия = «баркод:версия»; у одного человека может быть несколько устройств
+  const sessionOwners = await Promise.all(sessions.map((k) => env.SUBMISSIONS.get(k)));
+  const activePeople = new Set(sessionOwners.filter(Boolean).map((v) => v.split(':')[0])).size;
+  return [
+    '📊 <b>Статистика UIB Hub</b>',
+    '',
+    `👤 Аккаунтов: <b>${users.length}</b> (за сутки +${since(1)}, за неделю +${since(7)})`,
+    `🔑 Входили за 30 дней: <b>${activePeople}</b> чел. (устройств: ${sessions.length})`,
+    '',
+    `📚 Работ в базе: <b>${materials?.materials?.length ?? 0}</b> · файлов: ${files.length}`,
+    `🤫 Советов: <b>${tips?.tips?.length ?? 0}</b>`,
+    '',
+    `⏳ На модерации: работ ${pendingWorks.length}, советов ${pendingTips.length}`,
+    '',
+    'Посещения сайта — в Cloudflare → Web Analytics.',
+  ].join('\n');
+}
+
+// KV отдаёт ключи страницами по 1000
+async function listKeys(env, prefix) {
+  const names = [];
+  let cursor;
+  do {
+    const page = await env.SUBMISSIONS.list({ prefix, cursor });
+    names.push(...page.keys.map((k) => k.name));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return names;
+}
+
+async function readRepoJson(env, path) {
+  const branch = encodeURIComponent(env.GITHUB_BRANCH);
+  const res = await githubRaw(env, 'GET', `repos/${env.GITHUB_REPO}/contents/${path}?ref=${branch}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub ${res.status}`);
+  return JSON.parse(fromBase64((await res.json()).content));
 }
 
 async function closeCard(env, callback, status) {

@@ -220,13 +220,14 @@ await checkAsync('Разбор .ics', async () => {
 
 // --- Worker (Telegram, GitHub и KV — заглушки, в сеть ничего не уходит) ---
 
-await checkAsync('Worker: аккаунты, сброс пароля, аватарки, работы, заявки, файлы, советы', async () => {
+await checkAsync('Worker: аккаунты, сброс пароля, аватарки, работы, заявки, файлы, советы, /stats', async () => {
   const worker = (await importLocal('worker/src/index.js')).default;
   // KV в памяти: значение + metadata, как в Cloudflare
   const kv = new Map();
   const env = {
     SUBMISSIONS: {
-      get: async (k) => kv.get(k)?.value ?? null,
+      get: async (k, type) => { const v = kv.get(k)?.value ?? null; return type === 'json' && v !== null ? JSON.parse(v) : v; },
+      list: async ({ prefix = '' } = {}) => ({ keys: [...kv.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
       getWithMetadata: async (k) => kv.get(k) ?? { value: null, metadata: null },
       put: async (k, value, opts = {}) => { kv.set(k, { value, metadata: opts.metadata ?? null }); },
       delete: async (k) => { kv.delete(k); },
@@ -499,6 +500,23 @@ await checkAsync('Worker: аккаунты, сброс пароля, авата�
     await call('POST', '/auth/logout', { token });
     res = await call('GET', '/auth/me', { token });
     expect(res.status === 401, 'после выхода токен ещё работает');
+
+    // --- /stats в чате модераторов ---
+    const say = (text, chat = -1) => worker.fetch({
+      url: 'https://w.test/telegram',
+      method: 'POST',
+      headers: new Headers({ 'X-Telegram-Bot-Api-Secret-Token': 'S' }),
+      json: async () => ({ message: { message_id: 5, text, chat: { id: chat } } }),
+    }, env);
+    telegram.length = 0;
+    await say('/stats', 999);
+    await say('привет');
+    expect(telegram.length === 0, 'бот ответил не на /stats или в чужом чате');
+    await say('/stats@uib_hub_mod_bot');
+    const stats = telegram.find((m) => m.method === 'sendMessage')?.body.text ?? '';
+    const users = [...kv.keys()].filter((k) => k.startsWith('user:')).length;
+    expect(stats.includes(`Аккаунтов: <b>${users}</b>`), `в /stats неверное число аккаунтов: ${stats.split('\n')[2]}`);
+    expect(stats.includes(`Работ в базе: <b>${materials().length}</b>`), 'в /stats неверное число работ');
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -529,7 +547,8 @@ function fakeGitHub(initialFiles) {
       if (path.startsWith('git/commits/')) return reply({ tree: { sha: commitTrees.get(path.split('/').pop()) } });
       if (path.startsWith('contents/')) {
         const [file, query] = path.slice('contents/'.length).split('?ref=');
-        const bytes = trees.get(commitTrees.get(query)).get(file);
+        // ref — sha коммита или имя ветки
+        const bytes = trees.get(commitTrees.get(query === 'main' ? head : query)).get(file);
         // Как настоящий GitHub: файла ещё нет — 404
         return bytes ? reply({ content: bytes.toString('base64') }) : reply({ message: 'Not Found' }, 404);
       }

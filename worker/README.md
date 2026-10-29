@@ -82,7 +82,7 @@ Wrangler покажет адрес вида `https://uib-hub-submit.<аккау�
 Открой в браузере (подставь свои значения):
 
 ```
-https://api.telegram.org/bot<ТОКЕН>/setWebhook?url=https://uib-hub-submit.<аккаунт>.workers.dev/telegram&secret_token=<TELEGRAM_WEBHOOK_SECRET>&allowed_updates=["callback_query"]
+https://api.telegram.org/bot<ТОКЕН>/setWebhook?url=https://uib-hub-submit.<аккаунт>.workers.dev/telegram&secret_token=<TELEGRAM_WEBHOOK_SECRET>&allowed_updates=["callback_query","message"]
 ```
 
 Должно ответить `"ok":true`.
